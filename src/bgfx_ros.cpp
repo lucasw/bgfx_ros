@@ -5,7 +5,11 @@
 */
 
 #include <ros/ros.h>
+#include <SDL.h>
 #include <bgfx/bgfx.h>
+
+// this has to come after SDL.h
+#include <bgfx/platform.h>
 
 class BgfxRos
 {
