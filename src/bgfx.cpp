@@ -12,6 +12,7 @@
 #include <bgfx/platform.h>
 #include <bgfx/bgfx.h>
 #include <iostream>
+#include <sstream>
 #include <unistd.h>
 
 int main(int argc, char** argv)
@@ -46,10 +47,26 @@ int main(int argc, char** argv)
 
   bgfx::reset(1280, 720, BGFX_RESET_VSYNC);
 
+  bgfx::setDebug(BGFX_DEBUG_TEXT);
   bgfx::setViewClear(0, BGFX_CLEAR_COLOR | BGFX_CLEAR_DEPTH,
       0x303030ff, 1.0f, 0);
 
-	pause();
+  // while (true)
+  for (size_t i = 0; i < 100; ++i)
+  {
+    bgfx::touch(0);
+
+    bgfx::dbgTextClear();
+    std::stringstream ss;
+    ss << "test " << i;
+    bgfx::dbgTextPrintf(20, 20,
+        0x8f, ss.str().c_str());
+    std::cout << ss.str() << std::endl;
+
+    bgfx::frame();
+	  // pause();
+    usleep(50000);
+  }
 
   bgfx::shutdown();
 
