@@ -5,7 +5,7 @@
 */
 
 #include <ros/ros.h>
-#include <SDL.h>
+#include <SDL2/SDL.h>
 #include <bgfx/bgfx.h>
 
 // this has to come after SDL.h
@@ -13,6 +13,8 @@
 
 class BgfxRos
 {
+
+  SDL_window* window_;
 
   uint32_t width_;
   uint32_t height_;
@@ -22,6 +24,12 @@ public:
   bool initted_;
   bool init()
   {
+    window_ = SDL_CreateWindow("bgfx_ros", SDL_WINDOWPOS_UNDEFINED,
+				SDL_WINDOWPOS_UNDEFINED, width_, height_,
+				SDL_WINDOW_SHOWN | SDL_WINDOW_RESIZABLE);
+
+    bgfx::sdlSetWindow(window_);
+
     ROS_INFO_STREAM(width_ << " " << height_ << " " << reset_);
     ROS_INFO_STREAM(bgfx::RendererType::Count << " "
         << BGFX_PCI_ID_NONE);
