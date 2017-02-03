@@ -3,6 +3,8 @@
 
   https://github.com/lucasw/bgfx_ros
 
+  ~/other/bgfx/.build/linux64_gcc/bin/shadercDebug -f fs_cubes.sc -i $HOME/other/bgfx/src -o fs_cubes.bin --varyingdef ./varying.def.sc --platform linux --type fragment
+  ~/other/bgfx/.build/linux64_gcc/bin/shadercDebug -f vs_cubes.sc -i $HOME/other/bgfx/src -o vs_cubes.bin --varyingdef ./varying.def.sc --platform linux --type vertex
 
   g++ bgfx.cpp -g -I$HOME/other/bgfx/include -I$HOME/other/bx/include -L$HOME/other/bgfx/.build/linux64_gcc/bin -lbgfx-shared-libDebug -lGLU -lGL `sdl2-config --cflags --libs`
 */
@@ -11,9 +13,11 @@
 #include <SDL2/SDL_syswm.h>
 #include <bgfx/platform.h>
 #include <bgfx/bgfx.h>
+#include <fstream>
 #include <iostream>
 #include <sstream>
 #include <unistd.h>
+#include <vector>
 
 int main(int argc, char** argv)
 {
@@ -51,8 +55,39 @@ int main(int argc, char** argv)
   bgfx::setViewClear(0, BGFX_CLEAR_COLOR | BGFX_CLEAR_DEPTH,
       0x303030ff, 1.0f, 0);
 
+
+  bgfx::ShaderHandle fhandle;
+  {
+    const std::string path = "fs_cubes.bin";
+    bgfx::Memory mem;
+    // load bin into fmem - need to set fmem.data (uint8_t*) and fmem.size
+    std::ifstream ifs(path.c_str(), std::ios::binary | std::ios::ate);
+    std::ifstream::pos_type pos = ifs.tellg();
+    std::vector<uint8_t> result(pos);
+    mem.size = result.size();
+    mem.data = &result[0];
+    // TODO(lucasw) check if this worked
+    fhandle = bgfx::createShader(&mem);
+  }
+
+  bgfx::ShaderHandle vhandle;
+  {
+    const std::string path = "vs_cubes.bin";
+    bgfx::Memory mem;
+    std::ifstream ifs(path.c_str(), std::ios::binary | std::ios::ate);
+    std::ifstream::pos_type pos = ifs.tellg();
+    std::vector<uint8_t> result(pos);
+    mem.size = result.size();
+    mem.data = &result[0];
+    vhandle = bgfx::createShader(&mem);
+  }
+
+  bgfx::ProgramHandle program;
+  // TODO(lucasw) check if this worked
+  program = bgfx::createProgram(vhandle, fhandle, true);
+
   // while (true)
-  for (size_t i = 0; i < 100; ++i)
+  for (size_t i = 0; i < 5; ++i)
   {
     bgfx::touch(0);
 
