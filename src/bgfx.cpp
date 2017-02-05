@@ -3,8 +3,8 @@
 
   https://github.com/lucasw/bgfx_ros
 
-  ~/other/bgfx/.build/linux64_gcc/bin/shadercDebug -f fs_cubes.sc -i $HOME/other/bgfx/src -o fs_cubes.bin --varyingdef ./varying.def.sc --platform linux --type fragment
-  ~/other/bgfx/.build/linux64_gcc/bin/shadercDebug -f vs_cubes.sc -i $HOME/other/bgfx/src -o vs_cubes.bin --varyingdef ./varying.def.sc --platform linux --type vertex
+  ~/other/bgfx/.build/linux64_gcc/bin/shadercDebug -f fs_cubes.sc -i $HOME/other/bgfx/src -o fs_cubes.bin --varyingdef ./varying.def.sc --platform linux -p 120 --type fragment
+  ~/other/bgfx/.build/linux64_gcc/bin/shadercDebug -f vs_cubes.sc -i $HOME/other/bgfx/src -o vs_cubes.bin --varyingdef ./varying.def.sc --platform linux -p 120 --type vertex
 
   g++ bgfx.cpp -g -I$HOME/other/bgfx/include -I$HOME/other/bx/include -L$HOME/other/bgfx/.build/linux64_gcc/bin -lbgfx-shared-libDebug -lGLU -lGL `sdl2-config --cflags --libs` -std=c++11
 */
@@ -15,6 +15,7 @@
 #include <bgfx/bgfx.h>
 #include <bx/fpumath.h>
 #include <fstream>
+#include <iomanip>
 #include <iostream>
 #include <sstream>
 #include <unistd.h>
@@ -40,6 +41,27 @@ struct PosColorVertex
 };
 
 bgfx::VertexDecl PosColorVertex::decl_;
+
+
+void createShaderFromFile(const std::string path,
+    bgfx::Memory& mem,
+    std::vector<uint8_t>& result,
+    bgfx::ShaderHandle& handle)
+{
+  std::ifstream ifs(path.c_str(), std::ios::binary | std::ios::in);
+  result = std::vector<uint8_t>((std::istreambuf_iterator<char>(ifs)),
+      std::istreambuf_iterator<char>());
+  mem.size = result.size();
+  mem.data = &result[0];
+  std::cout << path << " shader size " << mem.size << std::endl;
+  for (size_t i = 0; i < 10; ++i)
+  {
+    std::cout << "0x" << std::setfill('0') << std::setw(2)
+      << std::hex << static_cast<int>(result[i]) << std::dec << std::endl;
+  }
+  // TODO(lucasw) check if this worked
+  handle = bgfx::createShader(&mem);
+}
 
 int main(int argc, char** argv)
 {
@@ -80,38 +102,28 @@ int main(int argc, char** argv)
   bgfx::setViewClear(0, BGFX_CLEAR_COLOR | BGFX_CLEAR_DEPTH,
       0x303030ff, 1.0f, 0);
 
-  PosColorVertex::init();
-  bgfx::ShaderHandle fhandle;
-  {
-    const std::string path = "fs_cubes.bin";
-    bgfx::Memory mem;
-    // load bin into fmem - need to set fmem.data (uint8_t*) and fmem.size
-    std::ifstream ifs(path.c_str(), std::ios::binary | std::ios::ate);
-    std::ifstream::pos_type pos = ifs.tellg();
-    std::vector<uint8_t> result(pos);
-    mem.size = result.size();
-    mem.data = &result[0];
-    // TODO(lucasw) check if this worked
-    fhandle = bgfx::createShader(&mem);
-  }
-
+  bgfx::Memory vmem;
+  std::vector<uint8_t> vresult;
   bgfx::ShaderHandle vhandle;
-  {
-    const std::string path = "vs_cubes.bin";
-    bgfx::Memory mem;
-    std::ifstream ifs(path.c_str(), std::ios::binary | std::ios::ate);
-    std::ifstream::pos_type pos = ifs.tellg();
-    std::vector<uint8_t> result(pos);
-    mem.size = result.size();
-    mem.data = &result[0];
-    vhandle = bgfx::createShader(&mem);
-  }
+  createShaderFromFile("vs_cubes.bin", vmem, vresult, vhandle);
+
+  bgfx::Memory fmem;
+  std::vector<uint8_t> fresult;
+  bgfx::ShaderHandle fhandle;
+  createShaderFromFile("fs_cubes.bin", fmem, fresult, fhandle);
 
   bgfx::ProgramHandle program;
-  // TODO(lucasw) check if this worked
+  std::cout << "############## create program ###########" << std::endl;
   program = bgfx::createProgram(vhandle, fhandle, true);
+  if (!isValid(program))
+  {
+    std::cerr << "creating shader program failed" << std::endl;
+    return 1;
+  }
+  std::cout << "#########################" << std::endl;
 
   // Make geometry
+  PosColorVertex::init();
   std::vector<PosColorVertex> vertices;
   for (size_t xi = 0; xi < 2; ++xi)
   {
@@ -146,7 +158,6 @@ int main(int argc, char** argv)
   triangle_list.push_back(2);
   triangle_list.push_back(4);
 
-  std::cout << "########## vertex ##########" << std::endl;
   bgfx::VertexBufferHandle vbh;
   {
     bgfx::Memory mem;
@@ -166,7 +177,6 @@ int main(int argc, char** argv)
 	float at[3]  = { 0.0f, 0.0f,   0.0f };
 	float eye[3] = { 0.0f, 0.0f, -35.0f };
 
-  std::cout << "#########################" << std::endl;
   // while (true)
   for (size_t i = 0; i < 5; ++i)
   {
@@ -176,7 +186,9 @@ int main(int argc, char** argv)
     bgfx::dbgTextPrintf(20, 20,
         0x8f, ss.str().c_str());
     std::cout << ss.str() << std::endl;
+  }
 
+  #if 0
 		float view[16];
 		bx::mtxLookAt(view, eye, at);
 
@@ -215,13 +227,14 @@ int main(int argc, char** argv)
 				);
 
 			// Submit primitive for rendering to view 0.
-			bgfx::submit(0, program);
+			// bgfx::submit(0, program);
 		}
 
     bgfx::frame();
 	  // pause();
     usleep(50000);
   }
+  #endif
 
   bgfx::destroyIndexBuffer(ibh);
   bgfx::destroyVertexBuffer(vbh);
