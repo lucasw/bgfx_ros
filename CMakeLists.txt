@@ -3,6 +3,7 @@ project(bgfx_ros)
 
 find_package(catkin REQUIRED COMPONENTS
   roscpp
+  roslib
   roslint
   rospy
 )
@@ -16,6 +17,8 @@ INCLUDE(FindPkgConfig)
 
 PKG_SEARCH_MODULE(SDL2 REQUIRED sdl2)
 # PKG_SEARCH_MODULE(SDL2IMAGE REQUIRED SDL2_image>=2.0.0)
+
+add_definitions(-std=c++11)
 ####
 
 find_package(OpenGL REQUIRED)
