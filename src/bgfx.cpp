@@ -54,12 +54,7 @@ void createShaderFromFile(const std::string path,
   // needed here?  Each bin already has a trailing 0
   // result.push_back('\0');
 
-  // TODO(lucasw) why alloc size when data point is to elsewhere?
-  const bgfx::Memory* mem = bgfx::alloc(result.size() * sizeof(uint16_t));
-  ((bgfx::Memory*)mem)->data = (uint8_t*)&result[0];
-  ((bgfx::Memory*)mem)->size = result.size();
-  // mem.size = result.size();
-  // mem.data = &result[0];
+  const bgfx::Memory* mem = bgfx::makeRef((uint8_t*)&result[0], result.size());
   std::cout << path << " shader size " << mem->size << std::endl;
   for (size_t i = result.size() - 10; i < result.size(); ++i)
   {
@@ -109,7 +104,6 @@ int main(int argc, char** argv)
   bgfx::setViewClear(0, BGFX_CLEAR_COLOR | BGFX_CLEAR_DEPTH,
       0x303030ff, 1.0f, 0);
 
-  #if 0
   std::cout << "### loading shaders ###" << std::endl;
   std::vector<uint8_t> vresult;
   bgfx::ShaderHandle vhandle;
@@ -120,14 +114,13 @@ int main(int argc, char** argv)
   createShaderFromFile("fs_cubes.bin", fresult, fhandle);
 
   bgfx::ProgramHandle program;
-  const bool destroy_shader = false;
+  const bool destroy_shader = true;
   program = bgfx::createProgram(vhandle, fhandle, destroy_shader);
   if (!isValid(program))
   {
     std::cerr << "creating shader program failed" << std::endl;
     return 1;
   }
-  #endif
 
   // Make geometry
   PosColorVertex::init();
@@ -167,24 +160,18 @@ int main(int argc, char** argv)
 
   bgfx::VertexBufferHandle vbh;
   {
-    const bgfx::Memory* mem = bgfx::alloc(sizeof(bgfx::Memory));  // vertices.size() * sizeof(uint16_t));
-    ((bgfx::Memory*)mem)->data = (uint8_t*)&vertices[0];
-    ((bgfx::Memory*)mem)->size = vertices.size();
+    const bgfx::Memory* mem = bgfx::makeRef((uint8_t*)&vertices[0], vertices.size());
     vbh = bgfx::createVertexBuffer(mem, PosColorVertex::decl_);
   }
 
   bgfx::IndexBufferHandle ibh;
-  // It's looking like bgfx doesn't loke Memory handled by anything but bgfx::alloc
-  // bgfx::Memory mem;
   {
-    const bgfx::Memory* mem = bgfx::alloc(sizeof(bgfx::Memory));  // triangle_list.size() * sizeof(uint16_t));
-    ((bgfx::Memory*)mem)->data = (uint8_t*)&triangle_list[0];
-    ((bgfx::Memory*)mem)->size = triangle_list.size();
+    const bgfx::Memory* mem = bgfx::makeRef((uint8_t*)&triangle_list[0], triangle_list.size());
     ibh = bgfx::createIndexBuffer(mem);
   }
 
 	float at[3]  = { 0.0f, 0.0f,   0.0f };
-	float eye[3] = { 0.0f, 0.0f, -35.0f };
+	float eye[3] = { 0.0f, 0.0f, -29.0f };
 
   // while (true)
   for (size_t i = 0; i < 15; ++i)
@@ -234,7 +221,7 @@ int main(int argc, char** argv)
 				);
 
 			// Submit primitive for rendering to view 0.
-			// bgfx::submit(0, program);
+			bgfx::submit(0, program);
 		}
 
     bgfx::frame();
@@ -244,6 +231,7 @@ int main(int argc, char** argv)
 
   bgfx::destroyIndexBuffer(ibh);
   bgfx::destroyVertexBuffer(vbh);
+  bgfx::destroyProgram(program);
   std::cout << "Shutting down" << std::endl;
   bgfx::shutdown();
 
