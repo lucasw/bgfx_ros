@@ -44,7 +44,6 @@ bgfx::VertexDecl PosColorVertex::decl_;
 
 
 void createShaderFromFile(const std::string path,
-    bgfx::Memory& mem,
     std::vector<uint8_t>& result,
     bgfx::ShaderHandle& handle)
 {
@@ -54,16 +53,21 @@ void createShaderFromFile(const std::string path,
   // TODO(lucasw) bgfx_util.cpp loadMem appends this to the end, is it
   // needed here?  Each bin already has a trailing 0
   // result.push_back('\0');
-  mem.size = result.size();
-  mem.data = &result[0];
-  std::cout << path << " shader size " << mem.size << std::endl;
+
+  // TODO(lucasw) why alloc size when data point is to elsewhere?
+  const bgfx::Memory* mem = bgfx::alloc(result.size() * sizeof(uint16_t));
+  ((bgfx::Memory*)mem)->data = (uint8_t*)&result[0];
+  ((bgfx::Memory*)mem)->size = result.size();
+  // mem.size = result.size();
+  // mem.data = &result[0];
+  std::cout << path << " shader size " << mem->size << std::endl;
   for (size_t i = result.size() - 10; i < result.size(); ++i)
   {
     std::cout << "0x" << std::setfill('0') << std::setw(2)
       << std::hex << static_cast<int>(result[i]) << std::dec << std::endl;
   }
   // TODO(lucasw) check if this worked
-  handle = bgfx::createShader(&mem);
+  handle = bgfx::createShader(mem);
 }
 
 int main(int argc, char** argv)
@@ -107,15 +111,13 @@ int main(int argc, char** argv)
 
   #if 0
   std::cout << "### loading shaders ###" << std::endl;
-  bgfx::Memory vmem;
   std::vector<uint8_t> vresult;
   bgfx::ShaderHandle vhandle;
-  createShaderFromFile("vs_cubes.bin", vmem, vresult, vhandle);
+  createShaderFromFile("vs_cubes.bin", vresult, vhandle);
 
-  bgfx::Memory fmem;
   std::vector<uint8_t> fresult;
   bgfx::ShaderHandle fhandle;
-  createShaderFromFile("fs_cubes.bin", fmem, fresult, fhandle);
+  createShaderFromFile("fs_cubes.bin", fresult, fhandle);
 
   bgfx::ProgramHandle program;
   const bool destroy_shader = false;
@@ -164,19 +166,21 @@ int main(int argc, char** argv)
   triangle_list.push_back(4);
 
   bgfx::VertexBufferHandle vbh;
-  bgfx::Memory vb_mem;
   {
-    vb_mem.data = (uint8_t*)(&vertices[0]);
-    vb_mem.size = vertices.size();
-    // vbh = bgfx::createVertexBuffer(&vb_mem, PosColorVertex::decl_);
+    const bgfx::Memory* mem = bgfx::alloc(sizeof(bgfx::Memory));  // vertices.size() * sizeof(uint16_t));
+    ((bgfx::Memory*)mem)->data = (uint8_t*)&vertices[0];
+    ((bgfx::Memory*)mem)->size = vertices.size();
+    vbh = bgfx::createVertexBuffer(mem, PosColorVertex::decl_);
   }
 
   bgfx::IndexBufferHandle ibh;
+  // It's looking like bgfx doesn't loke Memory handled by anything but bgfx::alloc
+  // bgfx::Memory mem;
   {
-    bgfx::Memory mem;
-    mem.data = (uint8_t*)&triangle_list[0];
-    mem.size = triangle_list.size();
-    // ibh = bgfx::createIndexBuffer(&mem);
+    const bgfx::Memory* mem = bgfx::alloc(sizeof(bgfx::Memory));  // triangle_list.size() * sizeof(uint16_t));
+    ((bgfx::Memory*)mem)->data = (uint8_t*)&triangle_list[0];
+    ((bgfx::Memory*)mem)->size = triangle_list.size();
+    ibh = bgfx::createIndexBuffer(mem);
   }
 
 	float at[3]  = { 0.0f, 0.0f,   0.0f };
@@ -218,11 +222,9 @@ int main(int argc, char** argv)
 			// Set model matrix for rendering.
 			bgfx::setTransform(mtx);
 
-      #if 0
 			// Set vertex and index buffer.
 			bgfx::setVertexBuffer(vbh);
 			bgfx::setIndexBuffer(ibh);
-      #endif
 
 			// Set render states.
 			bgfx::setState(0
@@ -240,10 +242,8 @@ int main(int argc, char** argv)
     usleep(105000);
   }
 
-  #if 0
   bgfx::destroyIndexBuffer(ibh);
   bgfx::destroyVertexBuffer(vbh);
-  #endif
   std::cout << "Shutting down" << std::endl;
   bgfx::shutdown();
 
