@@ -67,28 +67,28 @@ void createShaderFromFile(const std::string path,
 
 int main(int argc, char** argv)
 {
-	uint32_t width = 1280;
-	uint32_t height = 720;
+  uint32_t width = 1280;
+  uint32_t height = 720;
 
   SDL_Window* window = SDL_CreateWindow("bgfx_ros", SDL_WINDOWPOS_UNDEFINED,
       SDL_WINDOWPOS_UNDEFINED, width, height,
       SDL_WINDOW_SHOWN | SDL_WINDOW_RESIZABLE);
 
-	SDL_SysWMinfo wmi;
-	SDL_VERSION(&wmi.version);
-	if (!SDL_GetWindowWMInfo(window, &wmi) )
-	{
-		std::cerr << "couldn't get wm info" << std::endl;
-		return 1;
-	}
+  SDL_SysWMinfo wmi;
+  SDL_VERSION(&wmi.version);
+  if (!SDL_GetWindowWMInfo(window, &wmi) )
+  {
+    std::cerr << "couldn't get wm info" << std::endl;
+    return 1;
+  }
 
-	bgfx::PlatformData pd;
-	pd.ndt          = wmi.info.x11.display;
-	pd.nwh          = (void*)(uintptr_t)wmi.info.x11.window;
-	pd.context      = NULL;
-	pd.backBuffer   = NULL;
-	pd.backBufferDS = NULL;
-	bgfx::setPlatformData(pd);
+  bgfx::PlatformData pd;
+  pd.ndt          = wmi.info.x11.display;
+  pd.nwh          = (void*)(uintptr_t)wmi.info.x11.window;
+  pd.context      = NULL;
+  pd.backBuffer   = NULL;
+  pd.backBufferDS = NULL;
+  bgfx::setPlatformData(pd);
 
   if (!bgfx::init(bgfx::RendererType::Count, BGFX_PCI_ID_NONE))
   // if (!bgfx::init(bgfx::RendererType::OpenGL, BGFX_PCI_ID_NONE))
@@ -170,8 +170,8 @@ int main(int argc, char** argv)
     ibh = bgfx::createIndexBuffer(mem);
   }
 
-	float at[3]  = { 0.0f, 0.0f,   0.0f };
-	float eye[3] = { 0.0f, 0.0f, -29.0f };
+  float at[3]  = { 0.0f, 0.0f,   0.0f };
+  float eye[3] = { 0.0f, 0.0f, -29.0f };
 
   // while (true)
   for (size_t i = 0; i < 15; ++i)
@@ -183,49 +183,49 @@ int main(int argc, char** argv)
         0x8f, ss.str().c_str());
     std::cout << ss.str() << std::endl;
 
-		float view[16];
-		bx::mtxLookAt(view, eye, at);
+    float view[16];
+    bx::mtxLookAt(view, eye, at);
 
-		float proj[16];
-		bx::mtxProj(proj, 60.0f, float(width) / float(height), 0.1f, 100.0f);
-		bgfx::setViewTransform(0, view, proj);
+    float proj[16];
+    bx::mtxProj(proj, 60.0f, float(width) / float(height), 0.1f, 100.0f);
+    bgfx::setViewTransform(0, view, proj);
 
-		// Set view 0 default viewport.
-		bgfx::setViewRect(0, 0, 0, uint16_t(width), uint16_t(height) );
+    // Set view 0 default viewport.
+    bgfx::setViewRect(0, 0, 0, uint16_t(width), uint16_t(height) );
 
-		bgfx::touch(0);
+    bgfx::touch(0);
 
-		// draw a single cube
-		{
+    // draw a single cube
+    {
       const float fr = i * 0.01;
-			uint32_t xx = 0.0;
+      uint32_t xx = 0.0;
       uint32_t yy = 0.0;
-			float mtx[16];
-			bx::mtxRotateXY(mtx, fr + xx*0.21f, fr + yy*0.37f);
-			mtx[12] = -15.0f + float(xx)*3.0f;
-			mtx[13] = -15.0f + float(yy)*3.0f;
-			mtx[14] = 0.0f;
+      float mtx[16];
+      bx::mtxRotateXY(mtx, fr + xx*0.21f, fr + yy*0.37f);
+      mtx[12] = -15.0f + float(xx)*3.0f;
+      mtx[13] = -15.0f + float(yy)*3.0f;
+      mtx[14] = 0.0f;
 
-			// Set model matrix for rendering.
-			bgfx::setTransform(mtx);
+      // Set model matrix for rendering.
+      bgfx::setTransform(mtx);
 
-			// Set vertex and index buffer.
-			bgfx::setVertexBuffer(vbh);
-			bgfx::setIndexBuffer(ibh);
+      // Set vertex and index buffer.
+      bgfx::setVertexBuffer(vbh);
+      bgfx::setIndexBuffer(ibh);
 
-			// Set render states.
-			bgfx::setState(0
-				| BGFX_STATE_DEFAULT
-				// | BGFX_STATE_PT_TRILIST    // this doesn't exist
-				// | BGFX_STATE_PT_TRISTRIP
-				);
+      // Set render states.
+      bgfx::setState(0
+        | BGFX_STATE_DEFAULT
+        // | BGFX_STATE_PT_TRILIST    // this doesn't exist
+        // | BGFX_STATE_PT_TRISTRIP
+        );
 
-			// Submit primitive for rendering to view 0.
-			bgfx::submit(0, program);
-		}
+      // Submit primitive for rendering to view 0.
+      bgfx::submit(0, program);
+    }
 
     bgfx::frame();
-	  // pause();
+    // pause();
     usleep(105000);
   }
 
