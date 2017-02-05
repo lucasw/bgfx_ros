@@ -51,10 +51,13 @@ void createShaderFromFile(const std::string path,
   std::ifstream ifs(path.c_str(), std::ios::binary | std::ios::in);
   result = std::vector<uint8_t>((std::istreambuf_iterator<char>(ifs)),
       std::istreambuf_iterator<char>());
+  // TODO(lucasw) bgfx_util.cpp loadMem appends this to the end, is it
+  // needed here?  Each bin already has a trailing 0
+  // result.push_back('\0');
   mem.size = result.size();
   mem.data = &result[0];
   std::cout << path << " shader size " << mem.size << std::endl;
-  for (size_t i = 0; i < 10; ++i)
+  for (size_t i = result.size() - 10; i < result.size(); ++i)
   {
     std::cout << "0x" << std::setfill('0') << std::setw(2)
       << std::hex << static_cast<int>(result[i]) << std::dec << std::endl;
@@ -102,6 +105,8 @@ int main(int argc, char** argv)
   bgfx::setViewClear(0, BGFX_CLEAR_COLOR | BGFX_CLEAR_DEPTH,
       0x303030ff, 1.0f, 0);
 
+  #if 0
+  std::cout << "### loading shaders ###" << std::endl;
   bgfx::Memory vmem;
   std::vector<uint8_t> vresult;
   bgfx::ShaderHandle vhandle;
@@ -113,14 +118,14 @@ int main(int argc, char** argv)
   createShaderFromFile("fs_cubes.bin", fmem, fresult, fhandle);
 
   bgfx::ProgramHandle program;
-  std::cout << "############## create program ###########" << std::endl;
-  program = bgfx::createProgram(vhandle, fhandle, true);
+  const bool destroy_shader = false;
+  program = bgfx::createProgram(vhandle, fhandle, destroy_shader);
   if (!isValid(program))
   {
     std::cerr << "creating shader program failed" << std::endl;
     return 1;
   }
-  std::cout << "#########################" << std::endl;
+  #endif
 
   // Make geometry
   PosColorVertex::init();
@@ -159,11 +164,11 @@ int main(int argc, char** argv)
   triangle_list.push_back(4);
 
   bgfx::VertexBufferHandle vbh;
+  bgfx::Memory vb_mem;
   {
-    bgfx::Memory mem;
-    mem.data = (uint8_t*)(&vertices[0]);
-    mem.size = vertices.size();
-    vbh = bgfx::createVertexBuffer(&mem, PosColorVertex::decl_);
+    vb_mem.data = (uint8_t*)(&vertices[0]);
+    vb_mem.size = vertices.size();
+    // vbh = bgfx::createVertexBuffer(&vb_mem, PosColorVertex::decl_);
   }
 
   bgfx::IndexBufferHandle ibh;
@@ -171,14 +176,14 @@ int main(int argc, char** argv)
     bgfx::Memory mem;
     mem.data = (uint8_t*)&triangle_list[0];
     mem.size = triangle_list.size();
-    ibh = bgfx::createIndexBuffer(&mem);
+    // ibh = bgfx::createIndexBuffer(&mem);
   }
 
 	float at[3]  = { 0.0f, 0.0f,   0.0f };
 	float eye[3] = { 0.0f, 0.0f, -35.0f };
 
   // while (true)
-  for (size_t i = 0; i < 5; ++i)
+  for (size_t i = 0; i < 15; ++i)
   {
     bgfx::dbgTextClear();
     std::stringstream ss;
@@ -186,9 +191,7 @@ int main(int argc, char** argv)
     bgfx::dbgTextPrintf(20, 20,
         0x8f, ss.str().c_str());
     std::cout << ss.str() << std::endl;
-  }
 
-  #if 0
 		float view[16];
 		bx::mtxLookAt(view, eye, at);
 
@@ -215,15 +218,17 @@ int main(int argc, char** argv)
 			// Set model matrix for rendering.
 			bgfx::setTransform(mtx);
 
+      #if 0
 			// Set vertex and index buffer.
 			bgfx::setVertexBuffer(vbh);
 			bgfx::setIndexBuffer(ibh);
+      #endif
 
 			// Set render states.
 			bgfx::setState(0
 				| BGFX_STATE_DEFAULT
 				// | BGFX_STATE_PT_TRILIST    // this doesn't exist
-				// | BGFX_STATE_PT_TRISTRIP    // this doesn't exist
+				// | BGFX_STATE_PT_TRISTRIP
 				);
 
 			// Submit primitive for rendering to view 0.
@@ -232,12 +237,14 @@ int main(int argc, char** argv)
 
     bgfx::frame();
 	  // pause();
-    usleep(50000);
+    usleep(105000);
   }
-  #endif
 
+  #if 0
   bgfx::destroyIndexBuffer(ibh);
   bgfx::destroyVertexBuffer(vbh);
+  #endif
+  std::cout << "Shutting down" << std::endl;
   bgfx::shutdown();
 
   return 0;
