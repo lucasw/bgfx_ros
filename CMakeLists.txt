@@ -2,10 +2,12 @@ cmake_minimum_required(VERSION 2.8.3)
 project(bgfx_ros)
 
 find_package(catkin REQUIRED COMPONENTS
+  geometry_msgs
   roscpp
   roslib
   roslint
   rospy
+  tf
 )
 
 roslint_cpp()
@@ -41,12 +43,21 @@ link_directories(
 
 add_executable(bgfx_ros src/bgfx_ros.cpp)
 
-# add_dependencies(bgfx_ros bgfx_ros_gencpp)
-
 target_link_libraries(bgfx_ros
   ${catkin_LIBRARIES}
   # opengl has to come after bgfx
-  # bgfx-shared-libRelease
+  bgfx-shared-libRelease
+	${SDL2_LIBRARIES}  # ${SDL2IMAGE_LIBRARIES}
+  ${OPENGL_LIBRARIES}
+)
+
+add_executable(bgfx_ros_debug src/bgfx_ros.cpp)
+
+# add_dependencies(bgfx_ros bgfx_ros_gencpp)
+
+target_link_libraries(bgfx_ros_debug
+  ${catkin_LIBRARIES}
+  # opengl has to come after bgfx
   bgfx-shared-libDebug
 	${SDL2_LIBRARIES}  # ${SDL2IMAGE_LIBRARIES}
   ${OPENGL_LIBRARIES}

@@ -11,6 +11,7 @@
 #include <bgfx/bgfx.h>
 #include <bx/fpumath.h>
 #include <fstream>
+#include <geometry_msgs/Pose.h>
 #include <iomanip>
 #include <iostream>
 #include <ros/ros.h>
@@ -66,6 +67,7 @@ void createShaderFromFile(const std::string path,
 class BgfxRos
 {
   ros::NodeHandle nh_;
+  ros::Subscriber pose_sub_;
 
   SDL_Window* window_;
 
@@ -90,7 +92,16 @@ class BgfxRos
 
 public:
   bool initted_;
+  bool bgfx_initted_;
+
   bool init()
+  {
+    pose_sub_ = nh_.subscribe("pose", 5, &BgfxRos::poseCallback, this);
+    bgfx_initted_ = bgfxInit();
+    return true;
+  }
+
+  bool bgfxInit()
   {
     window_ = SDL_CreateWindow("bgfx_ros", SDL_WINDOWPOS_UNDEFINED,
         SDL_WINDOWPOS_UNDEFINED, width_, height_,
@@ -152,11 +163,11 @@ public:
 
     // Make geometry
     PosColorVertex::init();
-    for (size_t xi = 0; xi < 2; ++xi)
+    for (size_t zi = 0; zi < 2; ++zi)
     {
       for (size_t yi = 0; yi < 2; ++yi)
       {
-        for (size_t zi = 0; zi < 2; ++zi)
+        for (size_t xi = 0; xi < 2; ++xi)
         {
           PosColorVertex pcv;
           pcv.x_ = xi * 2.0 - 1.0;
@@ -172,17 +183,17 @@ public:
     triangle_list_.push_back(1);
     triangle_list_.push_back(2);
 
-    triangle_list_.push_back(1);
     triangle_list_.push_back(3);
-    triangle_list_.push_back(2);
-
-    triangle_list_.push_back(4);
-    triangle_list_.push_back(6);
+    triangle_list_.push_back(7);
+    triangle_list_.push_back(1);
     triangle_list_.push_back(5);
-
     triangle_list_.push_back(0);
-    triangle_list_.push_back(2);
     triangle_list_.push_back(4);
+    triangle_list_.push_back(2);
+    triangle_list_.push_back(6);
+    triangle_list_.push_back(7);
+    triangle_list_.push_back(4);
+    triangle_list_.push_back(5);
 
     {
       const bgfx::Memory* mem = bgfx::makeRef((uint8_t*)&vertices_[0], vertices_.size());
@@ -208,7 +219,8 @@ public:
     width_(width),
     height_(height),
     reset_(BGFX_RESET_VSYNC),
-    initted_(false)
+    initted_(false),
+    bgfx_initted_(false)
   {
     initted_ = init();
   }
@@ -217,10 +229,13 @@ public:
   {
     if (!initted_) return;
 
-    bgfx::destroyIndexBuffer(ibh_);
-    bgfx::destroyVertexBuffer(vbh_);
-    bgfx::destroyProgram(program_);
-    bgfx::shutdown();
+    if (bgfx_initted_)
+    {
+      bgfx::destroyIndexBuffer(ibh_);
+      bgfx::destroyVertexBuffer(vbh_);
+      bgfx::destroyProgram(program_);
+      bgfx::shutdown();
+    }
     initted_ = false;
   }
 
@@ -229,11 +244,25 @@ public:
     shutdown();
   }
 
+  void poseCallback(const geometry_msgs::PoseConstPtr& msg)
+  {
+    eye_[0] = msg->position.x;
+    eye_[1] = msg->position.y;
+    eye_[2] = msg->position.z;
+
+    at_[0] = msg->position.x;
+    at_[1] = msg->position.y;
+    at_[2] = msg->position.z + 49.0;
+
+    // ROS_INFO_STREAM(eye_[0] << " " << eye_[1] << " " << eye_[2]);
+    // tf::Pose;
+  }
+
   int i_;
 
   void update()
   {
-    if (!initted_) return;
+    if (!bgfx_initted_) return;
 
     bgfx::dbgTextClear();
     std::stringstream ss;
@@ -243,6 +272,7 @@ public:
     ROS_DEBUG_STREAM(ss.str());
 
     float view[16];
+    // ROS_INFO_STREAM(eye_[0] << " " << eye_[1] << " " << eye_[2]);
     bx::mtxLookAt(view, eye_, at_);
 
     float proj[16];
@@ -257,10 +287,10 @@ public:
     // draw a single cube
     {
       const float fr = i_ * 0.05;
-      uint32_t xx = 0.0;
-      uint32_t yy = 0.0;
+      uint32_t xx = 0.5;
+      uint32_t yy = 0.5;
       float mtx[16];
-      bx::mtxRotateXY(mtx, fr + xx*0.21f, fr + yy*0.37f);
+      bx::mtxRotateXY(mtx, xx*0.21f, yy*0.37f);
       mtx[12] = -15.0f + float(xx)*3.0f;
       mtx[13] = -15.0f + float(yy)*3.0f;
       mtx[14] = 0.0f;
@@ -302,6 +332,7 @@ int main(int argc, char** argv)
   while (ros::ok())
   {
     bgfx_ros.update();
+    ros::spinOnce();
     rate.sleep();
   }
 
