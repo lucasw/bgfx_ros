@@ -44,8 +44,10 @@ link_directories(
 
 add_executable(bgfx_ros src/bgfx_ros.cpp)
 
+find_library(bx_release libbxRelease.a $ENV{HOME}/other/bgfx/.build/linux64_gcc/bin)
 target_link_libraries(bgfx_ros
   ${catkin_LIBRARIES}
+  ${bx_release}
   # opengl has to come after bgfx
   bgfx-shared-libRelease
 	${SDL2_LIBRARIES}  # ${SDL2IMAGE_LIBRARIES}
@@ -56,8 +58,10 @@ add_executable(bgfx_ros_debug src/bgfx_ros.cpp)
 
 # add_dependencies(bgfx_ros bgfx_ros_gencpp)
 
+find_library(bx_debug libbxDebug.a $ENV{HOME}/other/bgfx/.build/linux64_gcc/bin)
 target_link_libraries(bgfx_ros_debug
   ${catkin_LIBRARIES}
+  ${bx_debug}
   # opengl has to come after bgfx
   bgfx-shared-libDebug
 	${SDL2_LIBRARIES}  # ${SDL2IMAGE_LIBRARIES}
