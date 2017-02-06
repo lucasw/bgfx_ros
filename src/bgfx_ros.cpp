@@ -345,7 +345,7 @@ public:
     // Set view 0 default viewport.
     bgfx::setViewName(0, "bgfx_ros");
     bgfx::setViewClear(0, BGFX_CLEAR_COLOR | BGFX_CLEAR_DEPTH,
-        0x305030ff, 1.0f, 0);
+        0x300030ff + ((i_ % 256) << 16), 1.0f, 0);
     bgfx::setViewRect(0, 0, 0, uint16_t(width_), uint16_t(height_));
     // TODO(lucasw)
     // It looks like the clear color is appearing on the copied rendered
@@ -384,7 +384,6 @@ public:
         | BGFX_STATE_RGB_WRITE
         | BGFX_STATE_ALPHA_WRITE
         );
-
       // Submit primitive for rendering to view 0.
       bgfx::submit(0, program_);
     }  // draw a cube
