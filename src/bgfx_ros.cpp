@@ -163,6 +163,7 @@ public:
 
     // Make geometry
     PosColorVertex::init();
+    int i = 0;
     for (size_t zi = 0; zi < 2; ++zi)
     {
       for (size_t yi = 0; yi < 2; ++yi)
@@ -173,8 +174,11 @@ public:
           pcv.x_ = xi * 2.0 - 1.0;
           pcv.y_ = yi * 2.0 - 1.0;
           pcv.z_ = zi * 2.0 - 1.0;
-          pcv.abgr_ = 0xff000000 + xi * 0xff0000 + yi * 0xff00 + zi * 0xff;
+          pcv.abgr_ = 0xff000000 + ((i * 16) << 16) + (((8 - i) * 31) << 8) + (128 + i * 8);
+          ROS_INFO_STREAM("0x" << std::setfill('0') << std::setw(8)
+              << std::hex << static_cast<long int>(pcv.abgr_) << std::dec);
           vertices_.push_back(pcv);
+          ++i;
         }
       }
     }
@@ -196,12 +200,14 @@ public:
     triangle_list_.push_back(5);
 
     {
-      const bgfx::Memory* mem = bgfx::makeRef((uint8_t*)&vertices_[0], vertices_.size());
+      const bgfx::Memory* mem = bgfx::makeRef((uint8_t*)&vertices_[0],
+          vertices_.size() * sizeof(PosColorVertex));
       vbh_ = bgfx::createVertexBuffer(mem, PosColorVertex::decl_);
     }
 
     {
-      const bgfx::Memory* mem = bgfx::makeRef((uint8_t*)&triangle_list_[0], triangle_list_.size());
+      const bgfx::Memory* mem = bgfx::makeRef((uint8_t*)&triangle_list_[0],
+          triangle_list_.size() * sizeof(uint16_t));
       ibh_ = bgfx::createIndexBuffer(mem);
     }
 
@@ -210,7 +216,7 @@ public:
     at_[2] = 0.0f;
     eye_[0] = 0.0f;
     eye_[1] = 0.0f;
-    eye_[2] = -49.0f;
+    eye_[2] = -35.0f;
 
     return true;
   }
@@ -285,10 +291,11 @@ public:
     bgfx::touch(0);
 
     // draw a single cube
+    for (uint32_t yy = 0; yy < 11; ++yy)
+    {
+    for (uint32_t xx = 0; xx < 11; ++xx)
     {
       const float fr = i_ * 0.05;
-      uint32_t xx = 0.5;
-      uint32_t yy = 0.5;
       float mtx[16];
       bx::mtxRotateXY(mtx, xx*0.21f, yy*0.37f);
       mtx[12] = -15.0f + float(xx)*3.0f;
@@ -312,6 +319,7 @@ public:
       // Submit primitive for rendering to view 0.
       bgfx::submit(0, program_);
     }  // draw a cube
+    }
 
     bgfx::frame();
     // update sdl processes
