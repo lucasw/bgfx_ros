@@ -199,7 +199,7 @@ public:
     at_[2] = 0.0f;
     eye_[0] = 0.0f;
     eye_[1] = 0.0f;
-    eye_[2] = -29.0f;
+    eye_[2] = -49.0f;
 
     return true;
   }
@@ -276,7 +276,7 @@ public:
       bgfx::setState(0
         | BGFX_STATE_DEFAULT
         // | BGFX_STATE_PT_TRILIST    // this doesn't exist
-        // | BGFX_STATE_PT_TRISTRIP
+        | BGFX_STATE_PT_TRISTRIP
         );
 
       // Submit primitive for rendering to view 0.
@@ -284,6 +284,9 @@ public:
     }  // draw a cube
 
     bgfx::frame();
+    // update sdl processes
+    SDL_Delay(1);
+    SDL_PollEvent(NULL);
     ++i_;
   }  // update
 };

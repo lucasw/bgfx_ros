@@ -174,7 +174,7 @@ int main(int argc, char** argv)
   float eye[3] = { 0.0f, 0.0f, -29.0f };
 
   // while (true)
-  for (size_t i = 0; i < 15; ++i)
+  for (size_t i = 0; i < 250; ++i)
   {
     bgfx::dbgTextClear();
     std::stringstream ss;
@@ -226,7 +226,9 @@ int main(int argc, char** argv)
 
     bgfx::frame();
     // pause();
-    usleep(105000);
+    SDL_Delay(30);
+    // The window will turn black if this isn't done
+    SDL_PollEvent(NULL);
   }
 
   bgfx::destroyIndexBuffer(ibh);
