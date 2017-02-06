@@ -10,6 +10,8 @@
 #include <bgfx/platform.h>
 #include <bgfx/bgfx.h>
 #include <bx/fpumath.h>
+#include <cv_bridge/cv_bridge.h>
+#include <opencv2/highgui.hpp>
 #include <fstream>
 #include <geometry_msgs/Pose.h>
 #include <iomanip>
@@ -57,7 +59,7 @@ void createShaderFromFile(const std::string path,
   ROS_INFO_STREAM(path << " shader size " << mem->size);
   for (size_t i = result.size() - 10; i < result.size(); ++i)
   {
-    ROS_INFO_STREAM("0x" << std::setfill('0') << std::setw(2)
+    ROS_DEBUG_STREAM("0x" << std::setfill('0') << std::setw(2)
       << std::hex << static_cast<int>(result[i]) << std::dec);
   }
   // TODO(lucasw) check if this worked
@@ -68,6 +70,9 @@ class BgfxRos
 {
   ros::NodeHandle nh_;
   ros::Subscriber pose_sub_;
+
+  // need two, one to write to and the other to display?
+  cv::Mat image_[2];
 
   SDL_Window* window_;
 
@@ -87,6 +92,10 @@ class BgfxRos
   bgfx::VertexBufferHandle vbh_;
   bgfx::ProgramHandle program_;
 
+  bgfx::FrameBufferHandle frame_buffer_handle_;
+  bgfx::TextureHandle frame_buffer_texture_[2];
+  bgfx::TextureHandle read_back_texture_;
+
   float at_[3];
   float eye_[3];
 
@@ -98,6 +107,9 @@ public:
   {
     pose_sub_ = nh_.subscribe("pose", 5, &BgfxRos::poseCallback, this);
     bgfx_initted_ = bgfxInit();
+
+    image_[0] = cv::Mat(cv::Size(width_, height_), CV_8UC4);
+    image_[1] = cv::Mat(cv::Size(width_, height_), CV_8UC4);
     return true;
   }
 
@@ -175,7 +187,7 @@ public:
           pcv.y_ = yi * 2.0 - 1.0;
           pcv.z_ = zi * 2.0 - 1.0;
           pcv.abgr_ = 0xff000000 + ((i * 16) << 16) + (((8 - i) * 31) << 8) + (128 + i * 8);
-          ROS_INFO_STREAM("0x" << std::setfill('0') << std::setw(8)
+          ROS_DEBUG_STREAM("0x" << std::setfill('0') << std::setw(8)
               << std::hex << static_cast<long int>(pcv.abgr_) << std::dec);
           vertices_.push_back(pcv);
           ++i;
@@ -217,6 +229,51 @@ public:
     eye_[0] = 0.0f;
     eye_[1] = 0.0f;
     eye_[2] = -35.0f;
+
+    if ((bgfx::getCaps()->supported & (BGFX_CAPS_TEXTURE_BLIT | BGFX_CAPS_TEXTURE_READ_BACK)) !=
+        (BGFX_CAPS_TEXTURE_BLIT|BGFX_CAPS_TEXTURE_READ_BACK))
+    {
+      ROS_ERROR_STREAM("can't read back texture");
+      return false;
+    }
+    const bool has_mips = false;
+    const uint16_t num_layers = 1;
+    read_back_texture_ = bgfx::createTexture2D(width_, height_,
+        has_mips, num_layers,
+        bgfx::TextureFormat::BGRA8, BGFX_TEXTURE_READ_BACK | BGFX_TEXTURE_BLIT_DST);
+    if (!bgfx::isValid(read_back_texture_))
+    {
+      ROS_ERROR_STREAM("couldn't create read back texture");
+      return false;
+    }
+
+    // the regular image texture
+    frame_buffer_texture_[0] = bgfx::createTexture2D(width_, height_,
+        has_mips, num_layers,
+        bgfx::TextureFormat::BGRA8,
+        BGFX_TEXTURE_RT | BGFX_TEXTURE_U_CLAMP | BGFX_TEXTURE_V_CLAMP);
+    if (!bgfx::isValid(frame_buffer_texture_[0]))
+    {
+      ROS_ERROR_STREAM("couldn't create read back image texture");
+      return false;
+    }
+    // depth texture- need to provide this?  Not going to use it
+    // ... unless for sim kinect node.
+    frame_buffer_texture_[1] = bgfx::createTexture2D(width_, height_,
+        has_mips, num_layers,
+        bgfx::TextureFormat::D16, BGFX_TEXTURE_RT_WRITE_ONLY);
+    if (!bgfx::isValid(frame_buffer_texture_[1]))
+    {
+      ROS_ERROR_STREAM("couldn't create read back depth texture");
+      return false;
+    }
+
+    frame_buffer_handle_ = bgfx::createFrameBuffer(2, frame_buffer_texture_);
+    if (frame_buffer_handle_.idx == bgfx::invalidHandle)
+    {
+      ROS_ERROR_STREAM("couldn't create fbh");
+      return false;
+    }
 
     return true;
   }
@@ -264,7 +321,7 @@ public:
     // tf::Pose;
   }
 
-  int i_;
+  uint32_t i_;
 
   void update()
   {
@@ -286,8 +343,17 @@ public:
     bgfx::setViewTransform(0, view, proj);
 
     // Set view 0 default viewport.
+    bgfx::setViewName(0, "bgfx_ros");
+    bgfx::setViewClear(0, BGFX_CLEAR_COLOR | BGFX_CLEAR_DEPTH,
+        0x305030ff, 1.0f, 0);
     bgfx::setViewRect(0, 0, 0, uint16_t(width_), uint16_t(height_));
-
+    // TODO(lucasw)
+    // It looks like the clear color is appearing on the copied rendered
+    // texture, but nothing else is getting rendered- no cubes.
+    // Nothing appears on the regular window, but that is okay.
+    // If this line is commented out then the cubes re-appear on the
+    // standard window.
+    bgfx::setViewFrameBuffer(0, frame_buffer_handle_);
     bgfx::touch(0);
 
     // draw a single cube
@@ -312,8 +378,11 @@ public:
       // Set render states.
       bgfx::setState(0
         | BGFX_STATE_DEFAULT
-        // | BGFX_STATE_PT_TRILIST    // this doesn't exist
+        // | BGFX_STATE_PT_TRILIST    // this doesn't exist - is it the default?
         | BGFX_STATE_PT_TRISTRIP
+        // TODO(lwalter) not sure about these
+        | BGFX_STATE_RGB_WRITE
+        | BGFX_STATE_ALPHA_WRITE
         );
 
       // Submit primitive for rendering to view 0.
@@ -321,10 +390,18 @@ public:
     }  // draw a cube
     }
 
-    bgfx::frame();
+    // TODO(lucasw) does there need to be a isValid every update?
+    bgfx::blit(0, read_back_texture_, 0, 0,
+        frame_buffer_texture_[0], 0, 0, width_, height_);
+    uint32_t read_frame = bgfx::readTexture(read_back_texture_, image_[i_ % 2].data);
+
+    uint32_t cur_frame = bgfx::frame();
+    ROS_INFO_STREAM("read " << read_frame << ", cur " << cur_frame);
     // update sdl processes
     SDL_Delay(1);
     SDL_PollEvent(NULL);
+    cv::imshow("image", image_[(i_ + 1) % 2]);
+    cv::waitKey(1);
     ++i_;
   }  // update
 };
@@ -340,6 +417,7 @@ int main(int argc, char** argv)
   while (ros::ok())
   {
     bgfx_ros.update();
+
     ros::spinOnce();
     rate.sleep();
   }
