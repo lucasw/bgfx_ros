@@ -160,13 +160,15 @@ int main(int argc, char** argv)
 
   bgfx::VertexBufferHandle vbh;
   {
-    const bgfx::Memory* mem = bgfx::makeRef((uint8_t*)&vertices[0], vertices.size());
+    const bgfx::Memory* mem = bgfx::makeRef((uint8_t*)&vertices[0],
+        vertices.size() * sizeof(PosColorVertex));
     vbh = bgfx::createVertexBuffer(mem, PosColorVertex::decl_);
   }
 
   bgfx::IndexBufferHandle ibh;
   {
-    const bgfx::Memory* mem = bgfx::makeRef((uint8_t*)&triangle_list[0], triangle_list.size());
+    const bgfx::Memory* mem = bgfx::makeRef((uint8_t*)&triangle_list[0],
+        triangle_list.size() * sizeof(uint16_t));
     ibh = bgfx::createIndexBuffer(mem);
   }
 
@@ -191,7 +193,7 @@ int main(int argc, char** argv)
     bgfx::setViewTransform(0, view, proj);
 
     // Set view 0 default viewport.
-    bgfx::setViewRect(0, 0, 0, uint16_t(width), uint16_t(height) );
+    bgfx::setViewRect(0, 0, 0, uint16_t(width), uint16_t(height));
 
     bgfx::touch(0);
 
