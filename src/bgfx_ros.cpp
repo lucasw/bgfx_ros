@@ -272,7 +272,7 @@ public:
       return false;
     }
 
-    uniform_handle_ = bgfx::createUniform("uniform_handle_", bgfx::UniformType::Int1);
+    // uniform_handle_ = bgfx::createUniform("uniform_handle_", bgfx::UniformType::Int1);
 
     frame_buffer_handle_ = bgfx::createFrameBuffer(2, frame_buffer_texture_);
     if (frame_buffer_handle_.idx == bgfx::invalidHandle)
@@ -328,6 +328,7 @@ public:
   }
 
   uint32_t i_;
+  uint32_t buffer_ind_;
 
   void update()
   {
@@ -350,9 +351,9 @@ public:
 
     // Set view 0 default viewport.
     bgfx::setViewName(0, "bgfx_ros");
+    bgfx::setViewRect(0, 0, 0, bgfx::BackbufferRatio::Equal);
     bgfx::setViewClear(0, BGFX_CLEAR_COLOR | BGFX_CLEAR_DEPTH,
         0x300030ff + (((i_ * 2) % 256) << 16), 1.0f, 0);
-    bgfx::setViewRect(0, 0, 0, uint16_t(width_), uint16_t(height_));
     // TODO(lucasw)
     // It looks like the clear color is appearing on the copied rendered
     // texture, but nothing else is getting rendered- no cubes.
@@ -364,6 +365,11 @@ public:
     // standard window.
     bgfx::setViewFrameBuffer(0, frame_buffer_handle_);
     bgfx::touch(0);
+
+    bgfx::setViewName(1, "backbuffer_render");
+    bgfx::setViewRect(1, 0, 0, bgfx::BackbufferRatio::Equal);
+    bgfx::FrameBufferHandle invalid = BGFX_INVALID_HANDLE;
+    bgfx::setViewFrameBuffer(1, invalid);
 
     // draw an array of cubes
     for (uint32_t yy = 0; yy < 11; ++yy)
@@ -386,7 +392,7 @@ public:
 
       // TODO(lucasw) bind the texture?
       // I don't actually use uniform_handle_ in any shader, is that the problem?
-      bgfx::setTexture(0, uniform_handle_, frame_buffer_texture_[0]);
+      // bgfx::setTexture(0, uniform_handle_, frame_buffer_texture_[0]);
 
       // Set render states.
       bgfx::setState(0
@@ -402,24 +408,34 @@ public:
     }  // draw a cube
     }
 
+    // bgfx::setTexture(1, uniform_handle_, frame_buffer_texture_[0]);
+    // bgfx::setState(BGFX_STATE_RGB_WRITE|BGFX_STATE_ALPHA_WRITE);
+    // submit a program that simply assigned the texColor to the frag color
+
     // TODO(lucasw) does there need to be a isValid every update?
-    bgfx::blit(0, read_back_texture_, 10, 20,
-        frame_buffer_texture_[0], 0, 0, width_ * 0.6, height_ * 0.8);
-    // toggle between the two image buffers
-    const size_t image_ind = i_ % image_.size();
-    const uint32_t read_frame = bgfx::readTexture(read_back_texture_,
-        image_[image_ind].data);
+    if (bgfx::isValid(read_back_texture_))
+    {
+      bgfx::touch(1);
+      bgfx::blit(1, read_back_texture_, 0, 0,
+          // bgfx::getTexture(frame_buffer_handle_), 0, 0, width_, height_);
+          frame_buffer_texture_[0], 0, 0, width_, height_);
+      // toggle between the two image buffers
+      const size_t image_ind = (buffer_ind_) % image_.size();
+      const uint32_t read_frame = bgfx::readTexture(read_back_texture_,
+          image_[image_ind].data);
+      // Display the oldest image for debug, later publish it on a topic instead
+      // Surely the oldest image is done being written to by now?
+      // Could actually track the expected frame it will be done.
+      cv::imshow("image", image_[(image_ind + 1) % image_.size()]);
+      cv::waitKey(1);
+      ++buffer_ind_;
+    }
 
     const uint32_t cur_frame = bgfx::frame();
-    ROS_DEBUG_STREAM("read " << read_frame << ", cur " << cur_frame << " " << image_ind);
+    // ROS_DEBUG_STREAM("read " << read_frame << ", cur " << cur_frame << " " << image_ind);
     // update sdl processes
     SDL_Delay(1);
     SDL_PollEvent(NULL);
-    // Display the oldest image for debug, later publish it on a topic instead
-    // Surely the oldest image is done being written to by now?
-    // Could actually track the expected frame it will be done.
-    cv::imshow("image", image_[(image_ind + 1) % image_.size()]);
-    cv::waitKey(1);
     ++i_;
   }  // update
 };
