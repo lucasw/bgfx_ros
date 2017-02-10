@@ -150,7 +150,7 @@ public:
   bool bgfxInit()
   {
     window_ = SDL_CreateWindow("bgfx_ros", SDL_WINDOWPOS_UNDEFINED,
-        SDL_WINDOWPOS_UNDEFINED, width_, height_,
+        SDL_WINDOWPOS_UNDEFINED, 100, 10,
         SDL_WINDOW_SHOWN | SDL_WINDOW_RESIZABLE);
 
     SDL_SysWMinfo wmi;
