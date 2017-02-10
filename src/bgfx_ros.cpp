@@ -10,10 +10,12 @@
 #include <bgfx/platform.h>
 #include <bgfx/bgfx.h>
 #include <bx/fpumath.h>
+#include <camera_info_manager/camera_info_manager.h>
 #include <cv_bridge/cv_bridge.h>
 #include <opencv2/highgui.hpp>
 #include <fstream>
 #include <geometry_msgs/Pose.h>
+#include <image_transport/image_transport.h>
 #include <iomanip>
 #include <iostream>
 #include <ros/ros.h>
@@ -70,15 +72,19 @@ class BgfxRos
 {
   ros::NodeHandle nh_;
   ros::Subscriber pose_sub_;
+  image_transport::ImageTransport it_;
+  image_transport::CameraPublisher cam_pub_;
+  boost::shared_ptr<camera_info_manager::CameraInfoManager> camera_info_manager_;
+  std::string frame_id_;
 
   // need two, one to write to and the other to display?
   std::vector<cv::Mat> image_;
 
   SDL_Window* window_;
 
-  uint32_t width_;
-  uint32_t height_;
-  uint32_t reset_;
+  int width_;
+  int height_;
+  int reset_;
 
   std::vector<PosColorVertex> vertices_;
   std::vector<uint16_t> triangle_list_;
@@ -107,13 +113,37 @@ public:
   bool init()
   {
     pose_sub_ = nh_.subscribe("pose", 5, &BgfxRos::poseCallback, this);
+    cam_pub_ = it_.advertiseCamera("image", 1);
     bgfx_initted_ = bgfxInit();
+
+    ros::param::get("~width", width_);
+    ros::param::get("~height", height_);
 
     image_.resize(4);
     for (size_t i = 0; i < image_.size(); ++i)
     {
       image_[i] = cv::Mat(cv::Size(width_, height_), CV_8UC4);
     }
+
+    std::string camera_name = "camera";
+    ros::param::get("~camera_name", camera_name);
+    std::string camera_info_url = "";
+    ros::param::get("~camera_info_url", camera_info_url);
+    camera_info_manager_.reset(new camera_info_manager::CameraInfoManager(nh_,
+          camera_name, camera_info_url));
+
+    ros::param::get("~frame_id", frame_id_);
+    if (!camera_info_manager_->isCalibrated())
+    {
+      // the loading of camera_info_url failed, so make a camera info here
+      camera_info_manager_->setCameraName(camera_name);
+      sensor_msgs::CameraInfo camera_info;
+      camera_info.header.frame_id = frame_id_;
+      camera_info.width = width_;
+      camera_info.height = height_;
+      camera_info_manager_->setCameraInfo(camera_info);
+    }
+
     return true;
   }
 
@@ -147,7 +177,7 @@ public:
       return false;
     }
 
-    bgfx::reset(width_, height_, BGFX_RESET_VSYNC);
+    bgfx::reset(width_, height_, reset_);
 
     bgfx::setDebug(BGFX_DEBUG_TEXT);
     bgfx::setViewClear(0, BGFX_CLEAR_COLOR | BGFX_CLEAR_DEPTH,
@@ -285,6 +315,7 @@ public:
   }
 
   BgfxRos(uint32_t width = 1280, uint32_t height = 720) :
+    it_(nh_),
     width_(width),
     height_(height),
     reset_(BGFX_RESET_VSYNC),
@@ -345,6 +376,12 @@ public:
     // ROS_INFO_STREAM(eye_[0] << " " << eye_[1] << " " << eye_[2]);
     bx::mtxLookAt(view, eye_, at_);
 
+    // TODO(lucasw) need to take the camera info intrinsic matrix
+    // and construct parts of the projection matrix from it.
+    // The thing to do first is calculate an angle-of-view in degrees
+    // for mtxProj.
+    // The distortion can be handled downstream using a distortion node,
+    // but later a gpu version would be interesting to have.
     float proj[16];
     bx::mtxProj(proj, 60.0f, float(width_) / float(height_), 0.1f, 100.0f);
     bgfx::setViewTransform(0, view, proj);
@@ -426,15 +463,28 @@ public:
       // Display the oldest image for debug, later publish it on a topic instead
       // Surely the oldest image is done being written to by now?
       // Could actually track the expected frame it will be done.
-      cv::imshow("image", image_[(image_ind + 1) % image_.size()]);
-      cv::waitKey(1);
+      // cv::imshow("image", image_[(image_ind + 1) % image_.size()]);
+      // cv::waitKey(1);
+
+      sensor_msgs::CameraInfoPtr ci(new sensor_msgs::CameraInfo(
+          camera_info_manager_->getCameraInfo()));
+      ci->header.stamp = ros::Time::now();
+      ci->header.frame_id = frame_id_;
+      // TODO(lwalter) later this will be have to determined earlier, has to be
+      // slightly old in order for tf lookups to work
+      cv_bridge::CvImage cv_image;
+      cv_image.header.stamp = ci->header.stamp;
+      cv_image.encoding = "rgba8";
+      cv_image.image = image_[image_ind];
+      sensor_msgs::ImagePtr msg = cv_image.toImageMsg();
+      cam_pub_.publish(*msg, *ci);
       ++buffer_ind_;
     }
 
     const uint32_t cur_frame = bgfx::frame();
     // ROS_DEBUG_STREAM("read " << read_frame << ", cur " << cur_frame << " " << image_ind);
     // update sdl processes
-    SDL_Delay(1);
+    // SDL_Delay(1);
     SDL_PollEvent(NULL);
     ++i_;
   }  // update

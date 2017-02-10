@@ -2,8 +2,10 @@ cmake_minimum_required(VERSION 2.8.3)
 project(bgfx_ros)
 
 find_package(catkin REQUIRED COMPONENTS
+  camera_info_manager
   cv_bridge
   geometry_msgs
+  image_transport
   roscpp
   roslib
   roslint
