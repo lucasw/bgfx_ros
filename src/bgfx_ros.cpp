@@ -151,7 +151,7 @@ public:
   {
     window_ = SDL_CreateWindow("bgfx_ros", SDL_WINDOWPOS_UNDEFINED,
         SDL_WINDOWPOS_UNDEFINED, 100, 10,
-        SDL_WINDOW_SHOWN | SDL_WINDOW_RESIZABLE);
+        SDL_WINDOW_HIDDEN);
 
     SDL_SysWMinfo wmi;
     SDL_VERSION(&wmi.version);
