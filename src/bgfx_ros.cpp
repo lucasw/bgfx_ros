@@ -21,6 +21,7 @@
 #include <ros/ros.h>
 #include <ros/package.h>
 #include <sstream>
+#include <string>
 #include <unistd.h>
 #include <vector>
 
@@ -57,7 +58,8 @@ void createShaderFromFile(const std::string path,
   // needed here?  Each bin already has a trailing 0
   // result.push_back('\0');
 
-  const bgfx::Memory* mem = bgfx::makeRef((uint8_t*)&result[0], result.size());
+  const bgfx::Memory* mem = bgfx::makeRef(
+      reinterpret_cast<uint8_t*>(&result[0]), result.size());
   ROS_INFO_STREAM(path << " shader size " << mem->size);
   for (size_t i = result.size() - 10; i < result.size(); ++i)
   {
@@ -163,7 +165,7 @@ public:
 
     bgfx::PlatformData pd;
     pd.ndt          = wmi.info.x11.display;
-    pd.nwh          = (void*)(uintptr_t)wmi.info.x11.window;
+    pd.nwh          = reinterpret_cast<void*>(uintptr_t(wmi.info.x11.window));
     pd.context      = NULL;
     pd.backBuffer   = NULL;
     pd.backBufferDS = NULL;
@@ -222,7 +224,7 @@ public:
           pcv.z_ = zi * 2.0 - 1.0;
           pcv.abgr_ = 0xff000000 + ((i * 16) << 16) + (((8 - i) * 31) << 8) + (128 + i * 8);
           ROS_DEBUG_STREAM("0x" << std::setfill('0') << std::setw(8)
-              << std::hex << static_cast<long int>(pcv.abgr_) << std::dec);
+              << std::hex << static_cast<int32_t>(pcv.abgr_) << std::dec);
           vertices_.push_back(pcv);
           ++i;
         }
@@ -246,13 +248,14 @@ public:
     triangle_list_.push_back(5);
 
     {
-      const bgfx::Memory* mem = bgfx::makeRef((uint8_t*)&vertices_[0],
+      const bgfx::Memory* mem = bgfx::makeRef(reinterpret_cast<uint8_t*>(&vertices_[0]),
           vertices_.size() * sizeof(PosColorVertex));
       vbh_ = bgfx::createVertexBuffer(mem, PosColorVertex::decl_);
     }
 
     {
-      const bgfx::Memory* mem = bgfx::makeRef((uint8_t*)&triangle_list_[0],
+      const bgfx::Memory* mem = bgfx::makeRef(
+          reinterpret_cast<uint8_t*>(&triangle_list_[0]),
           triangle_list_.size() * sizeof(uint16_t));
       ibh_ = bgfx::createIndexBuffer(mem);
     }
@@ -314,7 +317,7 @@ public:
     return true;
   }
 
-  BgfxRos(uint32_t width = 1280, uint32_t height = 720) :
+  explicit BgfxRos(uint32_t width = 1280, uint32_t height = 720) :
     it_(nh_),
     width_(width),
     height_(height),
@@ -383,7 +386,8 @@ public:
     // The distortion can be handled downstream using a distortion node,
     // but later a gpu version would be interesting to have.
     float proj[16];
-    bx::mtxProj(proj, 60.0f, float(width_) / float(height_), 0.1f, 100.0f);
+    bx::mtxProj(proj, 60.0f,
+        static_cast<float>(width_) / static_cast<float>(height_), 0.1f, 100.0f);
     bgfx::setViewTransform(0, view, proj);
 
     // Set view 0 default viewport.
@@ -394,7 +398,7 @@ public:
     // TODO(lucasw)
     // It looks like the clear color is appearing on the copied rendered
     // texture, but nothing else is getting rendered- no cubes.
-    // Nothing appears on the regular window, but that is okay - 
+    // Nothing appears on the regular window, but that is okay -
     // I think if it were working the rendered texture would have to be copied
     // to that window to be display (even rendered onto quad texture that
     // fills the screen).
@@ -415,9 +419,9 @@ public:
     {
       const float fr = i_ * 0.1;
       float mtx[16];
-      bx::mtxRotateXY(mtx, xx*0.21f + fr, yy*0.37f);
-      mtx[12] = -20.0f + float(xx)*3.0f;
-      mtx[13] = -15.0f + float(yy)*3.0f;
+      bx::mtxRotateXY(mtx, xx * 0.21f + fr, yy * 0.37f);
+      mtx[12] = -20.0f + static_cast<float>(xx) * 3.0f;
+      mtx[13] = -15.0f + static_cast<float>(yy) * 3.0f;
       mtx[14] = 0.0f;
 
       // Set model matrix for rendering.
@@ -437,9 +441,8 @@ public:
         // | BGFX_STATE_PT_TRILIST    // this doesn't exist - is it the default?
         | BGFX_STATE_PT_TRISTRIP
         // TODO(lucasw) not sure about these
-        | BGFX_STATE_RGB_WRITE
         // | BGFX_STATE_ALPHA_WRITE
-        );
+        | BGFX_STATE_RGB_WRITE);
       // Submit primitive for rendering to view 0.
       bgfx::submit(0, program_);
     }  // draw a cube

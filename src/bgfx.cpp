@@ -18,6 +18,7 @@
 #include <iomanip>
 #include <iostream>
 #include <sstream>
+#include <string>
 #include <unistd.h>
 #include <vector>
 
@@ -54,7 +55,8 @@ void createShaderFromFile(const std::string path,
   // needed here?  Each bin already has a trailing 0
   // result.push_back('\0');
 
-  const bgfx::Memory* mem = bgfx::makeRef((uint8_t*)&result[0], result.size());
+  const bgfx::Memory* mem = bgfx::makeRef(
+      reinterpret_cast<uint8_t*>(&result[0]), result.size());
   std::cout << path << " shader size " << mem->size << std::endl;
   for (size_t i = result.size() - 10; i < result.size(); ++i)
   {
@@ -84,7 +86,7 @@ int main(int argc, char** argv)
 
   bgfx::PlatformData pd;
   pd.ndt          = wmi.info.x11.display;
-  pd.nwh          = (void*)(uintptr_t)wmi.info.x11.window;
+  pd.nwh          = reinterpret_cast<void*>((uintptr_t)wmi.info.x11.window);
   pd.context      = NULL;
   pd.backBuffer   = NULL;
   pd.backBufferDS = NULL;
@@ -160,14 +162,16 @@ int main(int argc, char** argv)
 
   bgfx::VertexBufferHandle vbh;
   {
-    const bgfx::Memory* mem = bgfx::makeRef((uint8_t*)&vertices[0],
+    const bgfx::Memory* mem = bgfx::makeRef(
+        reinterpret_cast<uint8_t*>(&vertices[0]),
         vertices.size() * sizeof(PosColorVertex));
     vbh = bgfx::createVertexBuffer(mem, PosColorVertex::decl_);
   }
 
   bgfx::IndexBufferHandle ibh;
   {
-    const bgfx::Memory* mem = bgfx::makeRef((uint8_t*)&triangle_list[0],
+    const bgfx::Memory* mem = bgfx::makeRef(
+        reinterpret_cast<uint8_t*>(&triangle_list[0]),
         triangle_list.size() * sizeof(uint16_t));
     ibh = bgfx::createIndexBuffer(mem);
   }
@@ -189,7 +193,9 @@ int main(int argc, char** argv)
     bx::mtxLookAt(view, eye, at);
 
     float proj[16];
-    bx::mtxProj(proj, 60.0f, float(width) / float(height), 0.1f, 100.0f);
+    bx::mtxProj(proj, 60.0f,
+        static_cast<float>(width) / static_cast<float>(height),
+        0.1f, 100.0f);
     bgfx::setViewTransform(0, view, proj);
 
     // Set view 0 default viewport.
@@ -203,9 +209,9 @@ int main(int argc, char** argv)
       uint32_t xx = 0.0;
       uint32_t yy = 0.0;
       float mtx[16];
-      bx::mtxRotateXY(mtx, fr + xx*0.21f, fr + yy*0.37f);
-      mtx[12] = -15.0f + float(xx)*3.0f;
-      mtx[13] = -15.0f + float(yy)*3.0f;
+      bx::mtxRotateXY(mtx, fr + xx * 0.21f, fr + yy * 0.37f);
+      mtx[12] = -15.0f + static_cast<float>(xx) * 3.0f;
+      mtx[13] = -15.0f + static_cast<float>(yy) * 3.0f;
       mtx[14] = 0.0f;
 
       // Set model matrix for rendering.
@@ -217,10 +223,9 @@ int main(int argc, char** argv)
 
       // Set render states.
       bgfx::setState(0
-        | BGFX_STATE_DEFAULT
-        // | BGFX_STATE_PT_TRILIST    // this doesn't exist
+        // | BGFX_STATE_PT_TRILIST    // this doesn't exist, but is default?
         // | BGFX_STATE_PT_TRISTRIP
-        );
+        | BGFX_STATE_DEFAULT);
 
       // Submit primitive for rendering to view 0.
       bgfx::submit(0, program);
