@@ -474,7 +474,7 @@ public:
       // slightly old in order for tf lookups to work
       cv_bridge::CvImage cv_image;
       cv_image.header.stamp = ci->header.stamp;
-      cv_image.encoding = "rgba8";
+      cv_image.encoding = "bgra8";
       cv_image.image = image_[image_ind];
       sensor_msgs::ImagePtr msg = cv_image.toImageMsg();
       cam_pub_.publish(*msg, *ci);
