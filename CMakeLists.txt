@@ -32,6 +32,21 @@ catkin_package(
   CATKIN_DEPENDS roscpp roslint rospy message_runtime
 )
 
+# Build shaders
+#  ~/other/bgfx/.build/linux64_gcc/bin/shadercDebug -f fs_cubes.sc -i $HOME/other/bgfx/src -o fs_cubes.bin --varyingdef ./varying.def.sc --platform linux -p 120 --type fragment
+
+add_custom_command(OUTPUT fs_cubes.bin PRE_LINK
+  COMMAND $ENV{HOME}/other/bgfx/.build/linux64_gcc/bin/shadercRelease -f ${CMAKE_CURRENT_LIST_DIR}/src/fs_cubes.sc -i $ENV{HOME}/other/bgfx/src -o ${CMAKE_CURRENT_SOURCE_DIR}/src/fs_cubes.bin --varyingdef ${CMAKE_CURRENT_LIST_DIR}/src/varying.def.sc --platform linux -p 120 --type fragment
+  DEPENDS ${CMAKE_CURRENT_LIST_DIR}/src/varying.def.sc ${CMAKE_CURRENT_LIST_DIR}/src/fs_cubes.sc
+  COMMENT "Fragment Shader"
+  )
+#  ~/other/bgfx/.build/linux64_gcc/bin/shadercDebug -f vs_cubes.sc -i $HOME/other/bgfx/src -o vs_cubes.bin --varyingdef ./varying.def.sc --platform linux -p 120 --type vertex
+add_custom_command(OUTPUT vs_cubes.bin PRE_LINK
+  COMMAND $ENV{HOME}/other/bgfx/.build/linux64_gcc/bin/shadercRelease -f ${CMAKE_CURRENT_LIST_DIR}/src/vs_cubes.sc -i $ENV{HOME}/other/bgfx/src -o ${CMAKE_CURRENT_SOURCE_DIR}/src/vs_cubes.bin --varyingdef ${CMAKE_CURRENT_LIST_DIR}/src/varying.def.sc --platform linux -p 120 --type vertex
+  DEPENDS ${CMAKE_CURRENT_LIST_DIR}/src/varying.def.sc ${CMAKE_CURRENT_LIST_DIR}/src/vs_cubes.sc
+  COMMENT "Vertex Shader"
+  )
+
 include_directories(
   $ENV{HOME}/other/bgfx/include
   $ENV{HOME}/other/bx/include
@@ -44,7 +59,7 @@ link_directories(
   $ENV{HOME}/other/bgfx/.build/linux64_gcc/bin
 )
 
-add_executable(bgfx_ros src/bgfx_ros.cpp)
+add_executable(bgfx_ros src/bgfx_ros.cpp fs_cubes.bin vs_cubes.bin)
 
 find_library(bx_release libbxRelease.a $ENV{HOME}/other/bgfx/.build/linux64_gcc/bin)
 target_link_libraries(bgfx_ros
@@ -69,3 +84,8 @@ target_link_libraries(bgfx_ros_debug
 	${SDL2_LIBRARIES}  # ${SDL2IMAGE_LIBRARIES}
   ${OPENGL_LIBRARIES}
 )
+
+# install(TARGETS fs_cubes.bin vs_cubes.bin
+#     ARCHIVE DESTINATION ${CATKIN_PACKAGE_LIB_DESTINATION}
+#     LIBRARY DESTINATION ${CATKIN_PACKAGE_LIB_DESTINATION}
+#     RUNTIME DESTINATION ${CATKIN_GLOBAL_BIN_DESTINATION})
