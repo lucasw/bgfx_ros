@@ -72,7 +72,7 @@ target_link_libraries(bgfx_ros
   ${OPENGL_LIBRARIES}
 )
 
-add_executable(bgfx_ros_debug src/bgfx_ros.cpp)
+add_executable(bgfx_ros_debug src/bgfx_ros.cpp fs_cubes.bin vs_cubes.bin)
 
 # add_dependencies(bgfx_ros bgfx_ros_gencpp)
 
@@ -86,7 +86,12 @@ target_link_libraries(bgfx_ros_debug
   ${OPENGL_LIBRARIES}
 )
 
-# install(TARGETS fs_cubes.bin vs_cubes.bin
-#     ARCHIVE DESTINATION ${CATKIN_PACKAGE_LIB_DESTINATION}
-#     LIBRARY DESTINATION ${CATKIN_PACKAGE_LIB_DESTINATION}
-#     RUNTIME DESTINATION ${CATKIN_GLOBAL_BIN_DESTINATION})
+###
+
+install(FILES src/fs_cubes.bin src/vs_cubes.bin
+  DESTINATION ${CATKIN_PACKAGE_SHARE_DESTINATION}/src
+)
+install(TARGETS bgfx_ros
+    ARCHIVE DESTINATION ${CATKIN_PACKAGE_LIB_DESTINATION}
+    LIBRARY DESTINATION ${CATKIN_PACKAGE_LIB_DESTINATION}
+    RUNTIME DESTINATION ${CATKIN_GLOBAL_BIN_DESTINATION})
