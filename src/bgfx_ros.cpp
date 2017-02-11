@@ -368,7 +368,7 @@ public:
   {
     // TODO(lucasw)
     // construct a vertex and index buffer from the message
-    for (size_t i = 0; i msg.points.size(); ++i)
+    for (size_t i = 0; i < msg->points.size(); ++i)
     {
 
     }
