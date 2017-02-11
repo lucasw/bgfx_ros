@@ -11,6 +11,7 @@ find_package(catkin REQUIRED COMPONENTS
   roslint
   rospy
   tf
+  visualization_msgs
 )
 
 roslint_cpp()

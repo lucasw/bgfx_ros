@@ -24,6 +24,7 @@
 #include <string>
 #include <unistd.h>
 #include <vector>
+#include <visualization_msgs/Marker.h>
 
 
 struct PosColorVertex
@@ -74,6 +75,7 @@ class BgfxRos
 {
   ros::NodeHandle nh_;
   ros::Subscriber pose_sub_;
+  ros::Subscriber marker_sub_;
   image_transport::ImageTransport it_;
   image_transport::CameraPublisher cam_pub_;
   boost::shared_ptr<camera_info_manager::CameraInfoManager> camera_info_manager_;
@@ -115,6 +117,7 @@ public:
   bool init()
   {
     pose_sub_ = nh_.subscribe("pose", 5, &BgfxRos::poseCallback, this);
+    marker_sub_ = nh_.subscribe("marker", 5, &BgfxRos::markerCallback, this);
     cam_pub_ = it_.advertiseCamera("image", 1);
     bgfx_initted_ = bgfxInit();
 
@@ -359,6 +362,16 @@ public:
 
     // ROS_INFO_STREAM(eye_[0] << " " << eye_[1] << " " << eye_[2]);
     // tf::Pose;
+  }
+
+  void markerCallback(const visualization_msgs::MarkerConstPtr& msg)
+  {
+    // TODO(lucasw)
+    // construct a vertex and index buffer from the message
+    for (size_t i = 0; i msg.points.size(); ++i)
+    {
+
+    }
   }
 
   uint32_t i_;
