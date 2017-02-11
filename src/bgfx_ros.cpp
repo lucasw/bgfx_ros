@@ -18,6 +18,7 @@
 #include <image_transport/image_transport.h>
 #include <iomanip>
 #include <iostream>
+#include <map>
 #include <ros/ros.h>
 #include <ros/package.h>
 #include <sstream>
@@ -71,6 +72,54 @@ void createShaderFromFile(const std::string path,
   handle = bgfx::createShader(mem);
 }
 
+
+class Mesh
+{
+public:
+  Mesh(const visualization_msgs::MarkerConstPtr& msg) :
+    marker_(msg)
+  {
+    // construct a vertex and index buffer from the message
+    for (size_t i = 0; i < msg->points.size(); ++i)
+    {
+      // Make geometry
+      PosColorVertex pcv;
+      pcv.x_ = msg->points[i].x;
+      pcv.y_ = msg->points[i].y;
+      pcv.z_ = msg->points[i].z;
+      // pcv.abgr_ = 0xff000000 + ((i * 16) << 16) + (((8 - i) * 31) << 8) + (128 + i * 8);
+      // ROS_DEBUG_STREAM("0x" << std::setfill('0') << std::setw(8)
+      //    << std::hex << static_cast<int32_t>(pcv.abgr_) << std::dec);
+      vertices_.push_back(pcv);
+      // The Marker message doesn't re-use any triangles
+      triangle_list_.push_back(i);
+    }
+
+    {
+      const bgfx::Memory* mem = bgfx::makeRef(reinterpret_cast<uint8_t*>(&vertices_[0]),
+          vertices_.size() * sizeof(PosColorVertex));
+      vbh_ = bgfx::createVertexBuffer(mem, PosColorVertex::decl_);
+    }
+
+    {
+      const bgfx::Memory* mem = bgfx::makeRef(
+          reinterpret_cast<uint8_t*>(&triangle_list_[0]),
+          triangle_list_.size() * sizeof(uint16_t));
+      ibh_ = bgfx::createIndexBuffer(mem);
+    }
+  }
+
+  // TODO triangle list or strip mode
+
+  const visualization_msgs::MarkerConstPtr marker_;
+
+  std::vector<PosColorVertex> vertices_;
+  bgfx::VertexBufferHandle vbh_;
+
+  std::vector<uint16_t> triangle_list_;
+  bgfx::IndexBufferHandle ibh_;
+};
+
 class BgfxRos
 {
   ros::NodeHandle nh_;
@@ -90,16 +139,20 @@ class BgfxRos
   int height_;
   int reset_;
 
+  // namespace and id keys
+  std::map<std::string, std::map<int, Mesh*> > meshes_;
+
+  // TODO(lucasw) get rid of these
   std::vector<PosColorVertex> vertices_;
+  bgfx::VertexBufferHandle vbh_;
   std::vector<uint16_t> triangle_list_;
+  bgfx::IndexBufferHandle ibh_;
 
   std::vector<uint8_t> vresult_;
   std::vector<uint8_t> fresult_;
   bgfx::ShaderHandle vhandle_;
   bgfx::ShaderHandle fhandle_;
 
-  bgfx::IndexBufferHandle ibh_;
-  bgfx::VertexBufferHandle vbh_;
   bgfx::ProgramHandle program_;
 
   bgfx::FrameBufferHandle frame_buffer_handle_;
@@ -366,12 +419,20 @@ public:
 
   void markerCallback(const visualization_msgs::MarkerConstPtr& msg)
   {
-    // TODO(lucasw)
-    // construct a vertex and index buffer from the message
-    for (size_t i = 0; i < msg->points.size(); ++i)
+    if (meshes_.count(msg->ns) > 0)
     {
-
+      if (meshes_[msg->ns].count(msg->id) > 0)
+      {
+        delete meshes_[msg->ns][msg->id];
+        meshes_[msg->ns].erase(msg->id);
+      }
     }
+    else
+    {
+      std::map<int, Mesh*> mesh_by_id;
+      meshes_[msg->ns] = mesh_by_id;
+    }
+    meshes_[msg->ns][msg->id] = new Mesh(msg);
   }
 
   uint32_t i_;
@@ -461,6 +522,40 @@ public:
     }  // draw a cube
     }
 
+      bgfx::submit(0, program_);
+
+    for (auto const &ns_id : meshes_)
+    {
+      for (auto const &id_mesh : ns_id.second)
+      {
+        Mesh* mesh = id_mesh.second;
+
+        // TODO(lucasw) incorporate tf
+        // TODO(lucasw) set this up in advance?
+        float mtx[16];
+        bx::mtxRotateXY(mtx, 0, 0);
+        mtx[12] = mesh->marker_->pose.position.x;
+        mtx[13] = mesh->marker_->pose.position.y;
+        mtx[14] = mesh->marker_->pose.position.z;
+        // TODO(lucasw) orientation
+
+        // Set model matrix for rendering.
+        bgfx::setTransform(mtx);
+
+        bgfx::setVertexBuffer(mesh->vbh_);
+        bgfx::setIndexBuffer(mesh->ibh_);
+
+        // Set render states.
+        bgfx::setState(0
+          | BGFX_STATE_DEFAULT
+          // | BGFX_STATE_PT_TRILIST    // this doesn't exist - is it the default?
+          // TODO(lucasw) not sure about these
+          // | BGFX_STATE_ALPHA_WRITE
+          | BGFX_STATE_RGB_WRITE);
+        // Submit primitive for rendering to view 0.
+        bgfx::submit(0, program_);
+      }
+    }
     // bgfx::setTexture(1, uniform_handle_, frame_buffer_texture_[0]);
     // bgfx::setState(BGFX_STATE_RGB_WRITE|BGFX_STATE_ALPHA_WRITE);
     // submit a program that simply assigned the texColor to the frag color
