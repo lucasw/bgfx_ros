@@ -34,7 +34,7 @@ marker.scale.x = 1.0
 marker.scale.y = 1.0
 marker.scale.z = 1.0
 
-radius = 2.0
+radius = 4.0
 num_lat = 20
 num_long = 20
 for i in range(num_lat):

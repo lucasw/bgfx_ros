@@ -87,7 +87,19 @@ public:
       pcv.x_ = msg->points[i].x;
       pcv.y_ = msg->points[i].y;
       pcv.z_ = msg->points[i].z;
-      // pcv.abgr_ = 0xff000000 + ((i * 16) << 16) + (((8 - i) * 31) << 8) + (128 + i * 8);
+      if (i < msg->colors.size())
+      {
+        const uint8_t r = msg->colors[i].r * 255;
+        const uint8_t g = msg->colors[i].g * 255;
+        const uint8_t b = msg->colors[i].b * 255;
+        const uint8_t a = msg->colors[i].a * 255;
+
+        pcv.abgr_ = (a << 24) + (r << 16) + (g << 8) + (b);
+      }
+      else
+      {
+        pcv.abgr_ = (0xff << 24) + (50 << 16) + (10 << 8) + (200);
+      }
       // ROS_DEBUG_STREAM("0x" << std::setfill('0') << std::setw(8)
       //    << std::hex << static_cast<int32_t>(pcv.abgr_) << std::dec);
       vertices_.push_back(pcv);
@@ -109,6 +121,11 @@ public:
     }
   }
 
+  ~Mesh()
+  {
+    bgfx::destroyIndexBuffer(ibh_);
+    bgfx::destroyVertexBuffer(vbh_);
+  }
   // TODO triangle list or strip mode
 
   const visualization_msgs::MarkerConstPtr marker_;
@@ -142,12 +159,6 @@ class BgfxRos
   // namespace and id keys
   std::map<std::string, std::map<int, Mesh*> > meshes_;
 
-  // TODO(lucasw) get rid of these
-  std::vector<PosColorVertex> vertices_;
-  bgfx::VertexBufferHandle vbh_;
-  std::vector<uint16_t> triangle_list_;
-  bgfx::IndexBufferHandle ibh_;
-
   std::vector<uint8_t> vresult_;
   std::vector<uint8_t> fresult_;
   bgfx::ShaderHandle vhandle_;
@@ -177,7 +188,7 @@ public:
     ros::param::get("~width", width_);
     ros::param::get("~height", height_);
 
-    image_.resize(4);
+    image_.resize(3);
     for (size_t i = 0; i < image_.size(); ++i)
     {
       image_[i] = cv::Mat(cv::Size(width_, height_), CV_8UC4);
@@ -265,57 +276,6 @@ public:
 
     ///////////////
 
-    // Make geometry
-    PosColorVertex::init();
-    int i = 0;
-    for (size_t zi = 0; zi < 2; ++zi)
-    {
-      for (size_t yi = 0; yi < 2; ++yi)
-      {
-        for (size_t xi = 0; xi < 2; ++xi)
-        {
-          PosColorVertex pcv;
-          pcv.x_ = xi * 2.0 - 1.0;
-          pcv.y_ = yi * 2.0 - 1.0;
-          pcv.z_ = zi * 2.0 - 1.0;
-          pcv.abgr_ = 0xff000000 + ((i * 16) << 16) + (((8 - i) * 31) << 8) + (128 + i * 8);
-          ROS_DEBUG_STREAM("0x" << std::setfill('0') << std::setw(8)
-              << std::hex << static_cast<int32_t>(pcv.abgr_) << std::dec);
-          vertices_.push_back(pcv);
-          ++i;
-        }
-      }
-    }
-
-    triangle_list_.push_back(0);
-    triangle_list_.push_back(1);
-    triangle_list_.push_back(2);
-
-    triangle_list_.push_back(3);
-    triangle_list_.push_back(7);
-    triangle_list_.push_back(1);
-    triangle_list_.push_back(5);
-    triangle_list_.push_back(0);
-    triangle_list_.push_back(4);
-    triangle_list_.push_back(2);
-    triangle_list_.push_back(6);
-    triangle_list_.push_back(7);
-    triangle_list_.push_back(4);
-    triangle_list_.push_back(5);
-
-    {
-      const bgfx::Memory* mem = bgfx::makeRef(reinterpret_cast<uint8_t*>(&vertices_[0]),
-          vertices_.size() * sizeof(PosColorVertex));
-      vbh_ = bgfx::createVertexBuffer(mem, PosColorVertex::decl_);
-    }
-
-    {
-      const bgfx::Memory* mem = bgfx::makeRef(
-          reinterpret_cast<uint8_t*>(&triangle_list_[0]),
-          triangle_list_.size() * sizeof(uint16_t));
-      ibh_ = bgfx::createIndexBuffer(mem);
-    }
-
     at_[0] = 0.0f;
     at_[1] = 0.0f;
     at_[2] = 0.0f;
@@ -390,8 +350,17 @@ public:
 
     if (bgfx_initted_)
     {
-      bgfx::destroyIndexBuffer(ibh_);
-      bgfx::destroyVertexBuffer(vbh_);
+
+      for (auto const &ns_id_map : meshes_)
+      {
+        for (auto const &id_pair : ns_id_map.second)
+        {
+          const std::string ns = ns_id_map.first;
+          const size_t id = id_pair.first;
+          delete meshes_[ns][id];
+          meshes_[ns].erase(id);
+        }
+      }
       bgfx::destroyProgram(program_);
       bgfx::shutdown();
     }
@@ -468,7 +437,7 @@ public:
     bgfx::setViewName(0, "bgfx_ros");
     bgfx::setViewRect(0, 0, 0, bgfx::BackbufferRatio::Equal);
     bgfx::setViewClear(0, BGFX_CLEAR_COLOR | BGFX_CLEAR_DEPTH,
-        0x300030ff + (((i_ * 2) % 256) << 16), 1.0f, 0);
+        0x300030ff + (((i_ * 10) % 256) << 16), 1.0f, 0);
     // TODO(lucasw)
     // It looks like the clear color is appearing on the copied rendered
     // texture, but nothing else is getting rendered- no cubes.
@@ -486,54 +455,16 @@ public:
     bgfx::FrameBufferHandle invalid = BGFX_INVALID_HANDLE;
     bgfx::setViewFrameBuffer(1, invalid);
 
-    // draw an array of cubes
-    for (uint32_t yy = 0; yy < 11; ++yy)
-    {
-    for (uint32_t xx = 0; xx < 16; ++xx)
-    {
-      const float fr = i_ * 0.1;
-      float mtx[16];
-      bx::mtxRotateXY(mtx, xx * 0.21f + fr, yy * 0.37f);
-      mtx[12] = -20.0f + static_cast<float>(xx) * 3.0f;
-      mtx[13] = -15.0f + static_cast<float>(yy) * 3.0f;
-      mtx[14] = 0.0f;
-
-      // Set model matrix for rendering.
-      bgfx::setTransform(mtx);
-
-      // Set vertex and index buffer.
-      bgfx::setVertexBuffer(vbh_);
-      bgfx::setIndexBuffer(ibh_);
-
-      // TODO(lucasw) bind the texture?
-      // I don't actually use uniform_handle_ in any shader, is that the problem?
-      // bgfx::setTexture(0, uniform_handle_, frame_buffer_texture_[0]);
-
-      // Set render states.
-      bgfx::setState(0
-        | BGFX_STATE_DEFAULT
-        // | BGFX_STATE_PT_TRILIST    // this doesn't exist - is it the default?
-        | BGFX_STATE_PT_TRISTRIP
-        // TODO(lucasw) not sure about these
-        // | BGFX_STATE_ALPHA_WRITE
-        | BGFX_STATE_RGB_WRITE);
-      // Submit primitive for rendering to view 0.
-      bgfx::submit(0, program_);
-    }  // draw a cube
-    }
-
-      bgfx::submit(0, program_);
-
     for (auto const &ns_id : meshes_)
     {
       for (auto const &id_mesh : ns_id.second)
       {
-        Mesh* mesh = id_mesh.second;
+        const Mesh* const mesh = id_mesh.second;
 
         // TODO(lucasw) incorporate tf
         // TODO(lucasw) set this up in advance?
         float mtx[16];
-        bx::mtxRotateXY(mtx, 0, 0);
+        bx::mtxRotateXY(mtx, i_ * 0.1, 0);
         mtx[12] = mesh->marker_->pose.position.x;
         mtx[13] = mesh->marker_->pose.position.y;
         mtx[14] = mesh->marker_->pose.position.z;
@@ -556,9 +487,6 @@ public:
         bgfx::submit(0, program_);
       }
     }
-    // bgfx::setTexture(1, uniform_handle_, frame_buffer_texture_[0]);
-    // bgfx::setState(BGFX_STATE_RGB_WRITE|BGFX_STATE_ALPHA_WRITE);
-    // submit a program that simply assigned the texColor to the frag color
 
     // TODO(lucasw) does there need to be a isValid every update?
     if (bgfx::isValid(read_back_texture_))
