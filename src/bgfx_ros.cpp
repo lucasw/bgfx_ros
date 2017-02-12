@@ -180,13 +180,11 @@ public:
 
   bool init()
   {
-    pose_sub_ = nh_.subscribe("pose", 5, &BgfxRos::poseCallback, this);
-    marker_sub_ = nh_.subscribe("marker", 5, &BgfxRos::markerCallback, this);
-    cam_pub_ = it_.advertiseCamera("image", 1);
-    bgfx_initted_ = bgfxInit();
 
     ros::param::get("~width", width_);
     ros::param::get("~height", height_);
+
+    cam_pub_ = it_.advertiseCamera("image", 1);
 
     image_.resize(3);
     for (size_t i = 0; i < image_.size(); ++i)
@@ -212,6 +210,11 @@ public:
       camera_info.height = height_;
       camera_info_manager_->setCameraInfo(camera_info);
     }
+
+    bgfx_initted_ = bgfxInit();
+
+    pose_sub_ = nh_.subscribe("pose", 5, &BgfxRos::poseCallback, this);
+    marker_sub_ = nh_.subscribe("marker", 5, &BgfxRos::markerCallback, this);
 
     return true;
   }
@@ -275,6 +278,7 @@ public:
     }
 
     ///////////////
+    PosColorVertex::init();
 
     at_[0] = 0.0f;
     at_[1] = 0.0f;
