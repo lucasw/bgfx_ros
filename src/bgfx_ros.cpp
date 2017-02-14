@@ -92,12 +92,12 @@ public:
       pcv.z_ = msg->points[i].z;
       if (i < msg->colors.size())
       {
-        const uint8_t r = msg->colors[i].r * 255;
-        const uint8_t g = msg->colors[i].g * 255;
         const uint8_t b = msg->colors[i].b * 255;
+        const uint8_t g = msg->colors[i].g * 255;
+        const uint8_t r = msg->colors[i].r * 255;
         const uint8_t a = msg->colors[i].a * 255;
 
-        pcv.abgr_ = (a << 24) + (r << 16) + (g << 8) + (b);
+        pcv.abgr_ = (a << 24) + (b << 16) + (g << 8) + (r);
       }
       else
       {
