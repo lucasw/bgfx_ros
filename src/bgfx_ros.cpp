@@ -4,6 +4,9 @@
   https://github.com/lucasw/bgfx_ros
 */
 
+// TODO(lucasw) this cause problems when lower in the include list
+#include <tf/transform_listener.h>
+
 #include <SDL2/SDL.h>
 #include <SDL2/SDL_syswm.h>
 // this has to come after SDL.h
@@ -145,7 +148,11 @@ class BgfxRos
   image_transport::ImageTransport it_;
   image_transport::CameraPublisher cam_pub_;
   boost::shared_ptr<camera_info_manager::CameraInfoManager> camera_info_manager_;
+  // TODO(lucasw) in the future will want any number of cameras,
+  // for now just a single one.
   std::string frame_id_;
+
+  tf::TransformListener listener_;
 
   // need two, one to write to and the other to display?
   std::vector<cv::Mat> image_;
@@ -209,12 +216,25 @@ public:
       camera_info.header.frame_id = frame_id_;
       camera_info.width = width_;
       camera_info.height = height_;
+      camera_info.distortion_model = "plumb_bob";
+      camera_info.K[0] = 800;
+      camera_info.K[2] = width_ / 2;
+      camera_info.K[4] = 800;
+      camera_info.K[5] = height_ / 2;
+      camera_info.K[8] = 1.0;
+      // TODO(lucasw) what should these be
+      camera_info.P[0] = 800;
+      camera_info.P[2] = width_ / 2;
+      camera_info.P[5] = 800;
+      camera_info.P[6] = height_ / 2;
+      camera_info.P[10] = 1.0;
+      camera_info_manager_->setCameraInfo(camera_info);
       camera_info_manager_->setCameraInfo(camera_info);
     }
 
     bgfx_initted_ = bgfxInit();
 
-    pose_sub_ = nh_.subscribe("pose", 5, &BgfxRos::poseCallback, this);
+    // pose_sub_ = nh_.subscribe("pose", 5, &BgfxRos::poseCallback, this);
     marker_sub_ = nh_.subscribe("marker", 5, &BgfxRos::markerCallback, this);
 
     return true;
@@ -286,7 +306,7 @@ public:
     at_[2] = 0.0f;
     eye_[0] = 0.0f;
     eye_[1] = 0.0f;
-    eye_[2] = -15.0f;
+    eye_[2] = -1.0f;
 
     if ((bgfx::getCaps()->supported & (BGFX_CAPS_TEXTURE_BLIT | BGFX_CAPS_TEXTURE_READ_BACK)) !=
         (BGFX_CAPS_TEXTURE_BLIT|BGFX_CAPS_TEXTURE_READ_BACK))
@@ -342,6 +362,7 @@ public:
     it_(nh_),
     width_(width),
     height_(height),
+    frame_id_("camera_frame"),
     reset_(BGFX_RESET_VSYNC),
     initted_(false),
     bgfx_initted_(false),
@@ -378,6 +399,7 @@ public:
     shutdown();
   }
 
+#if 0
   void poseCallback(const geometry_msgs::PoseConstPtr& msg)
   {
     eye_[0] = msg->position.x;
@@ -391,6 +413,7 @@ public:
     // ROS_INFO_STREAM(eye_[0] << " " << eye_[1] << " " << eye_[2]);
     // tf::Pose;
   }
+#endif
 
   void markerCallback(const visualization_msgs::MarkerConstPtr& msg)
   {
@@ -469,12 +492,27 @@ public:
 
         // TODO(lucasw) incorporate tf
         // TODO(lucasw) set this up in advance?
-        float mtx[16];
-        bx::mtxRotateXY(mtx, i_ * 0.1, 0);
-        mtx[12] = mesh->marker_->pose.position.x;
-        mtx[13] = mesh->marker_->pose.position.y;
-        mtx[14] = mesh->marker_->pose.position.z;
+        tf::StampedTransform transform;
+        // TODO(lucasw) also need to take the marker pose
+        // into account- is there a function for that or will it have to be
+        // a manual matrix multiplication?
+        // TODO(lucasw) cache the transform to avoid multiple redundant lookups?
+        try
+        {
+          listener_.lookupTransform(mesh->marker_->header.frame_id, frame_id_,
+              ros::Time(0), transform);
+        }
+        catch (tf::TransformException &ex)
+        {
+          ROS_ERROR_STREAM(mesh->marker_->ns << " " << mesh->marker_->id);
+          ROS_ERROR("%s", ex.what());
+          continue;
+        }
+        double mtxd[16];
+        transform.getOpenGLMatrix(mtxd);
         // TODO(lucasw) orientation
+        float mtx[16];
+        std::copy(mtxd, mtxd + 16, mtx);
 
         // Set model matrix for rendering.
         bgfx::setTransform(mtx);
@@ -519,6 +557,7 @@ public:
       // slightly old in order for tf lookups to work
       cv_bridge::CvImage cv_image;
       cv_image.header.stamp = ci->header.stamp;
+      cv_image.header.frame_id = ci->header.frame_id;
       cv_image.encoding = "bgra8";
       cv_image.image = image_[image_ind];
       sensor_msgs::ImagePtr msg = cv_image.toImageMsg();
