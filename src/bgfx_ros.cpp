@@ -460,7 +460,9 @@ public:
     // The distortion can be handled downstream using a distortion node,
     // but later a gpu version would be interesting to have.
     float proj[16];
-    bx::mtxProj(proj, 2.0 * 180.0 / bx::pi * bx::fatan2(ci->K[5], ci->K[4]),
+    const float fovy = 0.9 * 2.0 * bx::fatan2(ci->K[5], ci->K[4]);
+    // const float fovx = 2.0 * bx::fatan2(ci->K[2], ci->K[0]);
+    bx::mtxProj(proj, fovy * 180.0 / bx::pi,
         static_cast<float>(width_) / static_cast<float>(height_), 0.1f, 100.0f);
     bgfx::setViewTransform(0, view, proj);
 
