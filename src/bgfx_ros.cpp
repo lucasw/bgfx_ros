@@ -173,6 +173,7 @@ class BgfxRos
 
   float at_[3];
   float eye_[3];
+  uint32_t clear_color_;
 
 public:
   bool initted_;
@@ -253,7 +254,7 @@ public:
 
     bgfx::setDebug(BGFX_DEBUG_TEXT);
     bgfx::setViewClear(0, BGFX_CLEAR_COLOR | BGFX_CLEAR_DEPTH,
-        0x303030ff, 1.0f, 0);
+        clear_color_, 1.0f, 0);
 
     ROS_INFO_STREAM(width_ << " " << height_ << " " << reset_);
     ROS_INFO_STREAM(bgfx::RendererType::Count << " "
@@ -343,7 +344,8 @@ public:
     height_(height),
     reset_(BGFX_RESET_VSYNC),
     initted_(false),
-    bgfx_initted_(false)
+    bgfx_initted_(false),
+    clear_color_(0x000000ff)
   {
     initted_ = init();
   }
@@ -441,7 +443,7 @@ public:
     bgfx::setViewName(0, "bgfx_ros");
     bgfx::setViewRect(0, 0, 0, bgfx::BackbufferRatio::Equal);
     bgfx::setViewClear(0, BGFX_CLEAR_COLOR | BGFX_CLEAR_DEPTH,
-        0x300030ff + (((i_ * 10) % 256) << 16), 1.0f, 0);
+        clear_color_, 1.0f, 0);
     // TODO(lucasw)
     // It looks like the clear color is appearing on the copied rendered
     // texture, but nothing else is getting rendered- no cubes.
