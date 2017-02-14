@@ -451,6 +451,8 @@ public:
     // ROS_INFO_STREAM(eye_[0] << " " << eye_[1] << " " << eye_[2]);
     bx::mtxLookAt(view, eye_, at_);
 
+    sensor_msgs::CameraInfoPtr ci(new sensor_msgs::CameraInfo(
+        camera_info_manager_->getCameraInfo()));
     // TODO(lucasw) need to take the camera info intrinsic matrix
     // and construct parts of the projection matrix from it.
     // The thing to do first is calculate an angle-of-view in degrees
@@ -458,7 +460,7 @@ public:
     // The distortion can be handled downstream using a distortion node,
     // but later a gpu version would be interesting to have.
     float proj[16];
-    bx::mtxProj(proj, 60.0f,
+    bx::mtxProj(proj, 2.0 * 180.0 / bx::pi * bx::fatan2(ci->K[5], ci->K[4]),
         static_cast<float>(width_) / static_cast<float>(height_), 0.1f, 100.0f);
     bgfx::setViewTransform(0, view, proj);
 
@@ -499,7 +501,8 @@ public:
         // TODO(lucasw) cache the transform to avoid multiple redundant lookups?
         try
         {
-          listener_.lookupTransform(mesh->marker_->header.frame_id, frame_id_,
+          // listener_.lookupTransform(mesh->marker_->header.frame_id, frame_id_,
+          listener_.lookupTransform(frame_id_, mesh->marker_->header.frame_id,
               ros::Time(0), transform);
         }
         catch (tf::TransformException &ex)
@@ -514,7 +517,14 @@ public:
         float mtx[16];
         std::copy(mtxd, mtxd + 16, mtx);
 
+        // TODO(lucasw) not sure where proper place for this correction is
+        float adj[16];
+        // bx::mtxRotateXYZ(adj, 0, bx::pi, 0);
+        // float res[16];
+        // bx::mtxMul(res, mtx, adj);
+
         // Set model matrix for rendering.
+        // bgfx::setTransform(res);
         bgfx::setTransform(mtx);
 
         bgfx::setVertexBuffer(mesh->vbh_);
@@ -549,8 +559,6 @@ public:
       // cv::imshow("image", image_[(image_ind + 1) % image_.size()]);
       // cv::waitKey(1);
 
-      sensor_msgs::CameraInfoPtr ci(new sensor_msgs::CameraInfo(
-          camera_info_manager_->getCameraInfo()));
       ci->header.stamp = ros::Time::now();
       ci->header.frame_id = frame_id_;
       // TODO(lwalter) later this will be have to determined earlier, has to be
