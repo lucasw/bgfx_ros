@@ -24,8 +24,8 @@ rospy.init_node('generate_marker')
 pub = rospy.Publisher("marker", Marker, queue_size=2)
 
 marker = Marker()
-marker.header.frame_id = "frame1"
-marker.ns = "temp"
+marker.header.frame_id = rospy.get_param("~frame_id", "frame1")
+marker.ns = marker.header.frame_id
 marker.id = 0
 marker.type = Marker.TRIANGLE_LIST
 marker.action = Marker.ADD
@@ -34,7 +34,7 @@ marker.scale.x = 1.0
 marker.scale.y = 1.0
 marker.scale.z = 1.0
 
-radius = 2.0
+radius = rospy.get_param("~radius", 2.0)
 num_lat = 20
 num_long = 20
 for i in range(num_lat):

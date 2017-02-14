@@ -8,10 +8,36 @@
     output="screen"
     args="/image" />
 
-<node pkg="tf" type="static_transform_publisher" name="frame1_broadcaster"
-    args="0 0 5.0 0 0 0.3 map frame1 100" />
 <!--
 <node pkg="tf" type="static_transform_publisher" name="camera_broadcaster"
     args="0 0 -1 0 0 0 map camera_frame 100" />
--->
+    -->
+  <node name="itf" pkg="rviz_interactive_tf" type="interactive_tf" ns="itf1">
+    <param name="parent_frame" value="map"/>
+    <param name="frame" value="camera_frame"/>
+  </node>
+
+  <node pkg="tf" type="static_transform_publisher" name="frame1_broadcaster"
+      args="0 0 5.0 0 0 0.3 map frame1 100" />
+  <node name="make_marker1" pkg="bgfx_ros" type="make_marker.py" >
+    <param name="frame_id" value="frame1" />
+  </node>
+
+  <node pkg="tf" type="static_transform_publisher" name="frame2_broadcaster"
+      args="5.0 0 5.0 0 0 0.0 map frame2 100" />
+  <node name="make_marker2" pkg="bgfx_ros" type="make_marker.py" >
+    <param name="frame_id" value="frame2" />
+    <param name="radius" value="1.0" />
+  </node>
+
+  <node pkg="tf" type="static_transform_publisher" name="frame3_broadcaster"
+      args="5.0 0 0.0 0 0 0.0 map frame3 100" />
+  <node name="make_marker3" pkg="bgfx_ros" type="make_marker.py" >
+    <param name="frame_id" value="frame3" />
+    <param name="radius" value="0.7" />
+  </node>
+
+  <node name="rviz" pkg="rviz" type="rviz"
+      args="-d $(find bgfx_ros)/config/bgfx.rviz" />
+
 </launch>
