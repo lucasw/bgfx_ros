@@ -1,0 +1,11 @@
+<?xml version="1.0"?>
+<launch>
+
+<node name="bgfx_ros" pkg="bgfx_ros" type="bgfx_ros"
+    output="screen"/>
+
+<node name="rqt_image_view" pkg="rqt_image_view" type="rqt_image_view"
+    output="screen"
+    args="/image" />
+
+</launch>
