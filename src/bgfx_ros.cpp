@@ -515,9 +515,35 @@ public:
         }
         double mtxd[16];
         transform.getOpenGLMatrix(mtxd);
-        // TODO(lucasw) orientation
         float mtx[16];
         std::copy(mtxd, mtxd + 16, mtx);
+        /*
+        0  1  2  3
+        4  5  6  7
+        8  9  10 11
+        12 13 14 15
+        */
+        #if 0
+        // this almost works, but still has a back to front flip
+        mtx[8] *= -1.0;
+        mtx[9] *= -1.0;
+        mtx[10] *= -1.0;
+        mtx[11] *= -1.0;
+        #endif
+
+        #if 0
+        for (size_t i = 4; i < 12; ++i)
+        {
+          mtx[i] *= -1.0;
+        }
+        #endif
+
+        #if 0
+        mtx[2] *= -1.0;
+        mtx[6] *= -1.0;
+        mtx[10] *= -1.0;
+        mtx[14] *= -1.0;
+        #endif
 
         // TODO(lucasw) not sure where proper place for this correction is
         float adj[16];
