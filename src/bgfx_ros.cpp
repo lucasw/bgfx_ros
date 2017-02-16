@@ -18,12 +18,14 @@
 #include <opencv2/highgui.hpp>
 #include <fstream>
 #include <geometry_msgs/Pose.h>
+#include <geometry_msgs/Vector3.h>
 #include <image_transport/image_transport.h>
 #include <iomanip>
 #include <iostream>
 #include <map>
 #include <ros/ros.h>
 #include <ros/package.h>
+#include <sensor_msgs/ChannelFloat32.h>
 #include <sstream>
 #include <string>
 #include <unistd.h>
@@ -143,7 +145,8 @@ public:
 class BgfxRos
 {
   ros::NodeHandle nh_;
-  ros::Subscriber pose_sub_;
+  sensor_msgs::ChannelFloat32 pre_mat_;
+  ros::Subscriber pre_mat_sub_;
   ros::Subscriber marker_sub_;
   image_transport::ImageTransport it_;
   image_transport::CameraPublisher cam_pub_;
@@ -188,7 +191,12 @@ public:
 
   bool init()
   {
-
+    pre_mat_.values.resize(16);
+    // identity
+    pre_mat_.values[0] = 1.0;
+    pre_mat_.values[5] = 1.0;
+    pre_mat_.values[10] = 1.0;
+    pre_mat_.values[15] = 1.0;
     ros::param::get("~width", width_);
     ros::param::get("~height", height_);
 
@@ -234,7 +242,7 @@ public:
 
     bgfx_initted_ = bgfxInit();
 
-    // pose_sub_ = nh_.subscribe("pose", 5, &BgfxRos::poseCallback, this);
+    pre_mat_sub_ = nh_.subscribe("pre_mat", 5, &BgfxRos::preMatCallback, this);
     marker_sub_ = nh_.subscribe("marker", 5, &BgfxRos::markerCallback, this);
 
     return true;
@@ -399,21 +407,23 @@ public:
     shutdown();
   }
 
-#if 0
-  void poseCallback(const geometry_msgs::PoseConstPtr& msg)
+  void preMatCallback(const sensor_msgs::ChannelFloat32ConstPtr& msg)
   {
-    eye_[0] = msg->position.x;
-    eye_[1] = msg->position.y;
-    eye_[2] = msg->position.z;
-
-    at_[0] = msg->position.x;
-    at_[1] = msg->position.y;
-    at_[2] = msg->position.z + 49.0;
-
-    // ROS_INFO_STREAM(eye_[0] << " " << eye_[1] << " " << eye_[2]);
-    // tf::Pose;
+    pre_mat_ = *msg;
   }
-#endif
+  geometry_msgs::Vector3 post_rot_;
+ 
+  void print4x4Mat(const float* mtx, const std::string name)
+  {
+    std::cout << name << std::endl;
+    for (size_t i = 0; i < 4; ++i)
+    {
+      for (size_t j = 0; j < 4; ++j)
+        std::cout << mtx[i * 4 + j] << " ";
+      std::cout << std::endl;
+    }
+    std::cout << std::endl;
+  }
 
   void markerCallback(const visualization_msgs::MarkerConstPtr& msg)
   {
@@ -513,58 +523,52 @@ public:
           ROS_ERROR("%s", ex.what());
           continue;
         }
-        double mtxd[16];
-        transform.getOpenGLMatrix(mtxd);
+
         float mtx[16];
-        std::copy(mtxd, mtxd + 16, mtx);
+        {
+          double mtxd[16];
+          // this flips the models front to back
+          transform.getOpenGLMatrix(mtxd);
+          std::copy(mtxd, mtxd + 16, mtx);
+          // print4x4Mat(mtx, "opengl");
+        }
+
         /*
         0  1  2  3
         4  5  6  7
         8  9  10 11
         12 13 14 15
+        
+        0  1  2  0
+        4  5  6  0
+        8  9  10 0
+        x  y  z  1.0
         */
-        #if 0
-        // this almost works, but still has a back to front flip
-        mtx[8] *= -1.0;
-        mtx[9] *= -1.0;
-        mtx[10] *= -1.0;
-        mtx[11] *= -1.0;
-        #endif
 
-        #if 0
-        for (size_t i = 4; i < 12; ++i)
+        float mat[16];
+        for (size_t i = 0; i < 16 && i < pre_mat_.values.size(); ++i)
         {
-          mtx[i] *= -1.0;
+          mat[i] = pre_mat_.values[i];
         }
-        #endif
-
-        #if 0
-        mtx[2] *= -1.0;
-        mtx[6] *= -1.0;
-        mtx[10] *= -1.0;
-        mtx[14] *= -1.0;
-        #endif
-
-        // TODO(lucasw) not sure where proper place for this correction is
-        float adj[16];
-        // bx::mtxRotateXYZ(adj, 0, bx::pi, 0);
-        // float res[16];
-        // bx::mtxMul(res, mtx, adj);
+        // print4x4Mat(mat, "pre mat");
+        float res[16];
+        bx::mtxMul(res, mat, mtx);
 
         // Set model matrix for rendering.
-        // bgfx::setTransform(res);
-        bgfx::setTransform(mtx);
+        bgfx::setTransform(res);
 
         bgfx::setVertexBuffer(mesh->vbh_);
         bgfx::setIndexBuffer(mesh->ibh_);
 
         // Set render states.
         bgfx::setState(0
-          | BGFX_STATE_DEFAULT
+            | BGFX_STATE_RGB_WRITE
+            | BGFX_STATE_ALPHA_WRITE
+            | BGFX_STATE_DEPTH_TEST_LESS
+            | BGFX_STATE_DEPTH_WRITE
+            | BGFX_STATE_CULL_CW
+            | BGFX_STATE_MSAA);
           // | BGFX_STATE_PT_TRILIST    // this doesn't exist - is it the default?
-          // TODO(lucasw) not sure about these
-          // | BGFX_STATE_ALPHA_WRITE
-          | BGFX_STATE_RGB_WRITE);
         // Submit primitive for rendering to view 0.
         bgfx::submit(0, program_);
       }

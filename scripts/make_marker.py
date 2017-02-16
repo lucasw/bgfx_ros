@@ -48,7 +48,7 @@ for i in range(num_lat):
         c11.a = 1.0
         c11.r = (j / 10.0) % 1.0
         c11.g = (i / 20.0) % 1.0
-        c11.b = (j / 50.0 / 255.0) % 1.0
+        c11.b = (j / 40.0) % 1.0
 
         p11 = sphere_point(radius, theta1, phi1)
         p12 = sphere_point(radius, theta1, phi2)
@@ -60,8 +60,8 @@ for i in range(num_lat):
             face1 = False
         if face1:
             marker.points.append(p11)
-            marker.points.append(p21)
             marker.points.append(p12)
+            marker.points.append(p21)
 
             marker.colors.append(c11)
             marker.colors.append(c11)
@@ -73,8 +73,8 @@ for i in range(num_lat):
 
         if face2:
             marker.points.append(p21)
-            marker.points.append(p22)
             marker.points.append(p12)
+            marker.points.append(p22)
 
             marker.colors.append(c11)
             marker.colors.append(c11)
