@@ -311,10 +311,11 @@ public:
 
     at_[0] = 0.0f;
     at_[1] = 0.0f;
-    at_[2] = 0.0f;
+    at_[2] = 1.0f;
+    // this is where the camera actually is
     eye_[0] = 0.0f;
     eye_[1] = 0.0f;
-    eye_[2] = -1.0f;
+    eye_[2] = 0.0f;
 
     if ((bgfx::getCaps()->supported & (BGFX_CAPS_TEXTURE_BLIT | BGFX_CAPS_TEXTURE_READ_BACK)) !=
         (BGFX_CAPS_TEXTURE_BLIT|BGFX_CAPS_TEXTURE_READ_BACK))
@@ -470,10 +471,12 @@ public:
     // The distortion can be handled downstream using a distortion node,
     // but later a gpu version would be interesting to have.
     float proj[16];
-    const float fovy = 0.9 * 2.0 * bx::fatan2(ci->K[5], ci->K[4]);
+    const float fovy = 2.0 * bx::fatan2(ci->K[5], ci->K[4]);
     // const float fovx = 2.0 * bx::fatan2(ci->K[2], ci->K[0]);
     bx::mtxProj(proj, fovy * 180.0 / bx::pi,
         static_cast<float>(width_) / static_cast<float>(height_), 0.1f, 100.0f);
+    // TODO(lucasw) also want ability to set projection matrix
+    // entirely from message
     bgfx::setViewTransform(0, view, proj);
 
     // Set view 0 default viewport.
