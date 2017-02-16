@@ -32,9 +32,10 @@
 
   <node pkg="tf" type="static_transform_publisher" name="frame3_broadcaster"
       args="5.0 0 0.0 0 0 0.0 map frame3 100" />
-  <node name="make_marker3" pkg="bgfx_ros" type="make_marker.py" >
+  <node name="make_marker3" pkg="bgfx_ros" type="cube_marker.py" >
     <param name="frame_id" value="frame3" />
-    <param name="radius" value="0.7" />
+    <param name="scale_x" value="2.0" />
+    <param name="scale_y" value="0.5" />
   </node>
 
   <node name="rviz" pkg="rviz" type="rviz"

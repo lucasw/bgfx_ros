@@ -34,6 +34,11 @@ marker.scale.x = 1.0
 marker.scale.y = 1.0
 marker.scale.z = 1.0
 
+marker.color.a = 1.0
+marker.color.r = rospy.get_param("~r", 1.0)
+marker.color.g = rospy.get_param("~g", 1.0)
+marker.color.b = rospy.get_param("~b", 1.0)
+
 radius = rospy.get_param("~radius", 2.0)
 num_lat = 20
 num_long = 20

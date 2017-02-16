@@ -84,32 +84,139 @@ public:
   Mesh(const visualization_msgs::MarkerConstPtr& msg) :
     marker_(msg)
   {
-    // construct a vertex and index buffer from the message
-    for (size_t i = 0; i < msg->points.size(); ++i)
-    {
-      // Make geometry
-      PosColorVertex pcv;
-      pcv.x_ = msg->points[i].x;
-      pcv.y_ = msg->points[i].y;
-      pcv.z_ = msg->points[i].z;
-      if (i < msg->colors.size())
-      {
-        const uint8_t b = msg->colors[i].b * 255;
-        const uint8_t g = msg->colors[i].g * 255;
-        const uint8_t r = msg->colors[i].r * 255;
-        const uint8_t a = msg->colors[i].a * 255;
+    const uint8_t b = marker_->color.b * 255;
+    const uint8_t g = marker_->color.g * 255;
+    const uint8_t r = marker_->color.r * 255;
+    const uint8_t a = marker_->color.a * 255;
+    uint32_t abgr = (a << 24) + (b << 16) + (g << 8) + (r);
 
-        pcv.abgr_ = (a << 24) + (b << 16) + (g << 8) + (r);
-      }
-      else
+    if (marker_->type == visualization_msgs::Marker::CUBE)
+    {
+      // construct a cube
+      for (size_t i = 0; i < 2; ++i)
       {
-        pcv.abgr_ = (0xff << 24) + (50 << 16) + (10 << 8) + (200);
+        for (size_t j = 0; j < 2; ++j)
+        {
+          for (size_t k = 0; k < 2; ++k)
+          {
+            const float x = (static_cast<float>(k) - 0.5) * marker_->scale.x;
+            const float y = (static_cast<float>(j) - 0.5) * marker_->scale.y;
+            const float z = (static_cast<float>(i) - 0.5) * marker_->scale.z;
+
+            // TODO(lucasw) need to transform each point by the provided pose and scale
+            PosColorVertex pcv;
+            pcv.x_ = x;
+            pcv.y_ = y;
+            pcv.z_ = z;
+            pcv.abgr_ = abgr;
+            vertices_.push_back(pcv);
+          }
+        }
       }
-      // ROS_DEBUG_STREAM("0x" << std::setfill('0') << std::setw(8)
-      //    << std::hex << static_cast<int32_t>(pcv.abgr_) << std::dec);
-      vertices_.push_back(pcv);
-      // The Marker message doesn't re-use any triangles
-      triangle_list_.push_back(i);
+
+      /*  
+          y
+          |
+          |__x
+          \
+           \
+            z
+
+          2-----3
+          |\    |\
+          | 6-----7
+          | |   | |
+          | |   | |
+          0-|---1 |
+           \|    \|
+            4-----5
+      */
+
+      // top face
+      triangle_list_.push_back(7);
+      triangle_list_.push_back(3);
+      triangle_list_.push_back(6);
+
+      triangle_list_.push_back(6);
+      triangle_list_.push_back(3);
+      triangle_list_.push_back(2);
+
+      // bottom face
+      triangle_list_.push_back(1);
+      triangle_list_.push_back(5);
+      triangle_list_.push_back(0);
+
+      triangle_list_.push_back(0);
+      triangle_list_.push_back(5);
+      triangle_list_.push_back(4);
+
+      // back face
+      triangle_list_.push_back(0);
+      triangle_list_.push_back(2);
+      triangle_list_.push_back(1);
+
+      triangle_list_.push_back(1);
+      triangle_list_.push_back(2);
+      triangle_list_.push_back(3);
+
+      // left face
+      triangle_list_.push_back(4);
+      triangle_list_.push_back(6);
+      triangle_list_.push_back(0);
+
+      triangle_list_.push_back(0);
+      triangle_list_.push_back(6);
+      triangle_list_.push_back(2);
+
+      // front face
+      triangle_list_.push_back(5);
+      triangle_list_.push_back(7);
+      triangle_list_.push_back(4);
+
+      triangle_list_.push_back(4);
+      triangle_list_.push_back(7);
+      triangle_list_.push_back(6);
+
+      // right face
+      triangle_list_.push_back(1);
+      triangle_list_.push_back(3);
+      triangle_list_.push_back(5);
+
+      triangle_list_.push_back(5);
+      triangle_list_.push_back(3);
+      triangle_list_.push_back(7);
+
+    }
+    else if (marker_->type == visualization_msgs::Marker::TRIANGLE_LIST)
+    {
+      // construct a vertex and index buffer from the message
+      for (size_t i = 0; i < msg->points.size(); ++i)
+      {
+        // Make geometry
+        // TODO(lucasw) need to transform each point by the provided pose and scale
+        PosColorVertex pcv;
+        pcv.x_ = msg->points[i].x;
+        pcv.y_ = msg->points[i].y;
+        pcv.z_ = msg->points[i].z;
+        if (i < msg->colors.size())
+        {
+          const uint8_t b = msg->colors[i].b * 255;
+          const uint8_t g = msg->colors[i].g * 255;
+          const uint8_t r = msg->colors[i].r * 255;
+          const uint8_t a = msg->colors[i].a * 255;
+
+          pcv.abgr_ = (a << 24) + (b << 16) + (g << 8) + (r);
+        }
+        else
+        {
+          pcv.abgr_ = (0xff << 24) + (50 << 16) + (10 << 8) + (200);
+        }
+        // ROS_DEBUG_STREAM("0x" << std::setfill('0') << std::setw(8)
+        //    << std::hex << static_cast<int32_t>(pcv.abgr_) << std::dec);
+        vertices_.push_back(pcv);
+        // The Marker message doesn't re-use any triangles
+        triangle_list_.push_back(i);
+      }
     }
 
     {
@@ -428,6 +535,7 @@ public:
 
   void markerCallback(const visualization_msgs::MarkerConstPtr& msg)
   {
+    // delete any existing mesh with the same ns and id
     if (meshes_.count(msg->ns) > 0)
     {
       if (meshes_[msg->ns].count(msg->id) > 0)
@@ -451,15 +559,19 @@ public:
   {
     if (!bgfx_initted_) return;
 
-    bgfx::dbgTextClear();
-    std::stringstream ss;
-    ss << "test " << i_;
-    bgfx::dbgTextPrintf(20, 20,
-        0x8f, ss.str().c_str());
-    ROS_DEBUG_STREAM(ss.str());
+    {
+      // TODO(lucasw) this doesn't appear on the texture image output,
+      bgfx::dbgTextClear();
+      std::stringstream ss;
+      ss << "test " << i_;
+      bgfx::dbgTextPrintf(20, 20,
+          0x8f, ss.str().c_str());
+      ROS_DEBUG_STREAM(ss.str());
+    }
 
+    // TODO(lucasw) allow every element of this matrix to be controlled
+    // via topic or service call
     float view[16];
-    // ROS_INFO_STREAM(eye_[0] << " " << eye_[1] << " " << eye_[2]);
     bx::mtxLookAt(view, eye_, at_);
 
     sensor_msgs::CameraInfoPtr ci(new sensor_msgs::CameraInfo(
@@ -484,15 +596,6 @@ public:
     bgfx::setViewRect(0, 0, 0, bgfx::BackbufferRatio::Equal);
     bgfx::setViewClear(0, BGFX_CLEAR_COLOR | BGFX_CLEAR_DEPTH,
         clear_color_, 1.0f, 0);
-    // TODO(lucasw)
-    // It looks like the clear color is appearing on the copied rendered
-    // texture, but nothing else is getting rendered- no cubes.
-    // Nothing appears on the regular window, but that is okay -
-    // I think if it were working the rendered texture would have to be copied
-    // to that window to be display (even rendered onto quad texture that
-    // fills the screen).
-    // If this line is commented out then the cubes re-appear on the
-    // standard window.
     bgfx::setViewFrameBuffer(0, frame_buffer_handle_);
     bgfx::touch(0);
 
