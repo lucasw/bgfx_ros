@@ -28,31 +28,37 @@
 #include <sensor_msgs/ChannelFloat32.h>
 #include <sstream>
 #include <string>
+#include <tf/tf.h>
 #include <unistd.h>
 #include <vector>
 #include <visualization_msgs/Marker.h>
 
 
-struct PosColorVertex
+struct PosNormalColorVertex
 {
   float x_;
   float y_;
   float z_;
+  float nx_;
+  float ny_;
+  float nz_;
   uint32_t abgr_;
 
   static void init()
   {
+    // TODO(lucasw) I think this has to match varying.def.sc
     decl_
       .begin()
       .add(bgfx::Attrib::Position, 3, bgfx::AttribType::Float)
-      .add(bgfx::Attrib::Color0,   4, bgfx::AttribType::Uint8, true)
+      .add(bgfx::Attrib::Normal, 3, bgfx::AttribType::Float)
+      .add(bgfx::Attrib::Color0, 4, bgfx::AttribType::Uint8, true)
       .end();
   };
 
   static bgfx::VertexDecl decl_;
 };
 
-bgfx::VertexDecl PosColorVertex::decl_;
+bgfx::VertexDecl PosNormalColorVertex::decl_;
 
 void createShaderFromFile(const std::string path,
     std::vector<uint8_t>& result,
@@ -104,10 +110,15 @@ public:
             const float z = (static_cast<float>(i) - 0.5) * marker_->scale.z;
 
             // TODO(lucasw) need to transform each point by the provided pose and scale
-            PosColorVertex pcv;
+            PosNormalColorVertex pcv;
             pcv.x_ = x;
             pcv.y_ = y;
             pcv.z_ = z;
+            tf::Vector3 normal(x, y, z);
+            normal.normalize();
+            pcv.nx_ = normal.getX();
+            pcv.ny_ = normal.getY();
+            pcv.nz_ = normal.getZ();
             pcv.abgr_ = abgr;
             vertices_.push_back(pcv);
           }
@@ -194,10 +205,17 @@ public:
       {
         // Make geometry
         // TODO(lucasw) need to transform each point by the provided pose and scale
-        PosColorVertex pcv;
+        PosNormalColorVertex pcv;
         pcv.x_ = msg->points[i].x;
         pcv.y_ = msg->points[i].y;
         pcv.z_ = msg->points[i].z;
+        // TODO(lucasw) a new message type for bgfx_ros will have normals provided in it
+        // so they won't have to be calculated in this node, but it is required for Markers
+        tf::Vector3 normal(pcv.x_, pcv.y_, pcv.z_);
+        normal.normalize();
+        pcv.nx_ = normal.getX();
+        pcv.ny_ = normal.getY();
+        pcv.nz_ = normal.getZ();
         if (i < msg->colors.size())
         {
           const uint8_t b = msg->colors[i].b * 255;
@@ -221,8 +239,8 @@ public:
 
     {
       const bgfx::Memory* mem = bgfx::makeRef(reinterpret_cast<uint8_t*>(&vertices_[0]),
-          vertices_.size() * sizeof(PosColorVertex));
-      vbh_ = bgfx::createVertexBuffer(mem, PosColorVertex::decl_);
+          vertices_.size() * sizeof(PosNormalColorVertex));
+      vbh_ = bgfx::createVertexBuffer(mem, PosNormalColorVertex::decl_);
     }
 
     {
@@ -242,7 +260,7 @@ public:
 
   const visualization_msgs::MarkerConstPtr marker_;
 
-  std::vector<PosColorVertex> vertices_;
+  std::vector<PosNormalColorVertex> vertices_;
   bgfx::VertexBufferHandle vbh_;
 
   std::vector<uint16_t> triangle_list_;
@@ -414,7 +432,7 @@ public:
     }
 
     ///////////////
-    PosColorVertex::init();
+    PosNormalColorVertex::init();
 
     at_[0] = 0.0f;
     at_[1] = 0.0f;

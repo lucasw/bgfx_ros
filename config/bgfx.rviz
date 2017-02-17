@@ -3,7 +3,8 @@ Panels:
     Help Height: 0
     Name: Displays
     Property Tree Widget:
-      Expanded: ~
+      Expanded:
+        - /Camera1
       Splitter Ratio: 0.5
     Tree Height: 360
   - Class: rviz/Selection
@@ -53,6 +54,7 @@ Visualization Manager:
       Namespaces:
         frame1: true
         frame2: true
+        frame3: true
       Queue Size: 100
       Value: true
     - Class: rviz/TF
@@ -65,6 +67,8 @@ Visualization Manager:
         frame1:
           Value: true
         frame2:
+          Value: true
+        frame3:
           Value: true
         map:
           Value: true
@@ -80,6 +84,8 @@ Visualization Manager:
           frame1:
             {}
           frame2:
+            {}
+          frame3:
             {}
       Update Interval: 0
       Value: true
@@ -97,7 +103,7 @@ Visualization Manager:
       Image Rendering: background and overlay
       Image Topic: /image
       Name: Camera
-      Overlay Alpha: 0.5
+      Overlay Alpha: 1
       Queue Size: 2
       Transport Hint: raw
       Unreliable: false
@@ -145,10 +151,10 @@ Visualization Manager:
         Z: 3.77382326
       Name: Current View
       Near Clip Distance: 0.00999999978
-      Pitch: 0.729796231
+      Pitch: 0.444796026
       Target Frame: <Fixed Frame>
       Value: Orbit (rviz)
-      Yaw: 5.45539236
+      Yaw: 4.25038815
     Saved: ~
 Window Geometry:
   Camera:
@@ -168,5 +174,5 @@ Window Geometry:
   Views:
     collapsed: true
   Width: 1457
-  X: 17
+  X: 16
   Y: 24
