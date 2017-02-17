@@ -105,9 +105,9 @@ public:
         {
           for (size_t k = 0; k < 2; ++k)
           {
-            const float x = (static_cast<float>(k) - 0.5) * marker_->scale.x;
-            const float y = (static_cast<float>(j) - 0.5) * marker_->scale.y;
-            const float z = (static_cast<float>(i) - 0.5) * marker_->scale.z;
+            const float x = -1.0 * (static_cast<float>(k) - 0.5) * marker_->scale.x;
+            const float y = -1.0 * (static_cast<float>(j) - 0.5) * marker_->scale.y;
+            const float z = -1.0 * (static_cast<float>(i) - 0.5) * marker_->scale.z;
 
             // TODO(lucasw) need to transform each point by the provided pose and scale
             PosNormalColorVertex pcv;
