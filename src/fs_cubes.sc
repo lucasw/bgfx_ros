@@ -7,12 +7,12 @@ $input v_normal, v_color0
 
 #include <bgfx_shader.sh>
 
+uniform vec4 light_dir;
+
 void main()
 {
   // this is in eye coords, need to transform it into the worlk
-  vec3 light_dir = vec3(1.0, 0.0, 0.0);
-  vec3 light_dir_eye = mul(vec4(light_dir, 1.0), u_view).xyz;
-  float ndotl = dot(normalize(v_normal), light_dir_eye);
+  float ndotl = -dot(normalize(v_normal), light_dir.xyz);
   // TODO(lwalter)
   // float spec = pow(nodtl
 	gl_FragColor = vec4(v_color0.xyz * ndotl, 1.0);

@@ -1,6 +1,8 @@
 <?xml version="1.0"?>
 <launch>
 
+  <!-- TODO(lucasw) arg whether to use rviz_interactive_tf or static frames -->
+
 <node name="bgfx_ros" pkg="bgfx_ros" type="bgfx_ros"
     output="screen"/>
 
@@ -12,9 +14,16 @@
 <node pkg="tf" type="static_transform_publisher" name="camera_broadcaster"
     args="0 0 -1 0 0 0 map camera_frame 100" />
     -->
-  <node name="itf" pkg="rviz_interactive_tf" type="interactive_tf" ns="itf1">
+  <node name="itf_camera" pkg="rviz_interactive_tf" type="interactive_tf"
+      ns="itf_camera">
     <param name="parent_frame" value="map"/>
     <param name="frame" value="camera_frame"/>
+  </node>
+
+  <node name="itf_light" pkg="rviz_interactive_tf" type="interactive_tf"
+      ns="itf_light">
+    <param name="parent_frame" value="map"/>
+    <param name="frame" value="light_frame"/>
   </node>
 
   <node pkg="tf" type="static_transform_publisher" name="frame1_broadcaster"

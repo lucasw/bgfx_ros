@@ -304,7 +304,9 @@ class BgfxRos
   bgfx::FrameBufferHandle frame_buffer_handle_;
   bgfx::TextureHandle frame_buffer_texture_[2];
   bgfx::TextureHandle read_back_texture_;
-  bgfx::UniformHandle uniform_handle_;
+
+  std::string light_frame_;
+  bgfx::UniformHandle light_dir_handle_;
 
   float at_[3];
   float eye_[3];
@@ -364,6 +366,8 @@ public:
       camera_info_manager_->setCameraInfo(camera_info);
       camera_info_manager_->setCameraInfo(camera_info);
     }
+
+    ros::param::get("~light_frame", light_frame_);
 
     bgfx_initted_ = bgfxInit();
 
@@ -480,7 +484,7 @@ public:
       return false;
     }
 
-    // uniform_handle_ = bgfx::createUniform("uniform_handle_", bgfx::UniformType::Int1);
+    light_dir_handle_ = bgfx::createUniform("light_dir", bgfx::UniformType::Vec4);
 
     frame_buffer_handle_ = bgfx::createFrameBuffer(2, frame_buffer_texture_);
     if (frame_buffer_handle_.idx == bgfx::invalidHandle)
@@ -497,6 +501,7 @@ public:
     width_(width),
     height_(height),
     frame_id_("camera_frame"),
+    light_frame_("light_frame"),
     reset_(BGFX_RESET_VSYNC),
     initted_(false),
     bgfx_initted_(false),
@@ -522,6 +527,7 @@ public:
           meshes_[ns].erase(id);
         }
       }
+      bgfx::destroyUniform(light_dir_handle_);
       bgfx::destroyProgram(program_);
       bgfx::shutdown();
     }
@@ -538,7 +544,7 @@ public:
     pre_mat_ = *msg;
   }
   geometry_msgs::Vector3 post_rot_;
- 
+
   void print4x4Mat(const float* mtx, const std::string name)
   {
     std::cout << name << std::endl;
@@ -572,6 +578,26 @@ public:
 
   uint32_t i_;
   uint32_t buffer_ind_;
+
+  bool lookupTf(const std::string parent, const std::string child,
+      const ros::Time ros_time,
+      tf::StampedTransform& transform,
+      const std::string ns = "", const int id = 0) const
+  {
+    try
+    {
+      // listener_.lookupTransform(mesh->marker_->header.frame_id, frame_id_,
+      listener_.lookupTransform(parent, child,
+          ros_time, transform);
+    }
+    catch (tf::TransformException &ex)
+    {
+      ROS_ERROR_STREAM(ns << " " << id);
+      ROS_ERROR("%s", ex.what());
+      return false;
+    }
+    return true;
+  }
 
   void update()
   {
@@ -622,6 +648,20 @@ public:
     bgfx::FrameBufferHandle invalid = BGFX_INVALID_HANDLE;
     bgfx::setViewFrameBuffer(1, invalid);
 
+    float light_dir[4];
+    tf::StampedTransform light_transform;
+    if (lookupTf(frame_id_, light_frame_,
+            ros::Time(0), light_transform,
+            "light dir"))
+    {
+      tf::Vector3 light_dir_vec(0, 0, 1);
+      light_dir_vec = light_transform.getBasis() * light_dir_vec;
+      light_dir[0] = static_cast<float>(light_dir_vec.getX());
+      light_dir[1] = static_cast<float>(light_dir_vec.getY());
+      light_dir[2] = static_cast<float>(light_dir_vec.getZ());
+      light_dir[3] = 1.0;
+    }
+
     for (auto const &ns_id : meshes_)
     {
       for (auto const &id_mesh : ns_id.second)
@@ -635,16 +675,10 @@ public:
         // into account- is there a function for that or will it have to be
         // a manual matrix multiplication?
         // TODO(lucasw) cache the transform to avoid multiple redundant lookups?
-        try
+        if (!lookupTf(frame_id_, mesh->marker_->header.frame_id,
+            ros::Time(0), transform,
+            mesh->marker_->ns, mesh->marker_->id))
         {
-          // listener_.lookupTransform(mesh->marker_->header.frame_id, frame_id_,
-          listener_.lookupTransform(frame_id_, mesh->marker_->header.frame_id,
-              ros::Time(0), transform);
-        }
-        catch (tf::TransformException &ex)
-        {
-          ROS_ERROR_STREAM(mesh->marker_->ns << " " << mesh->marker_->id);
-          ROS_ERROR("%s", ex.what());
           continue;
         }
 
@@ -678,6 +712,8 @@ public:
         float res[16];
         bx::mtxMul(res, mat, mtx);
 
+        // TODO(lucasw) does this have to be done inside this loop?
+        bgfx::setUniform(light_dir_handle_, light_dir);
         // Set model matrix for rendering.
         bgfx::setTransform(res);
 
