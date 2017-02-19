@@ -10,6 +10,7 @@ from geometry_msgs.msg import Point
 from std_msgs.msg import ColorRGBA
 from visualization_msgs.msg import Marker
 
+
 def sphere_point(radius, theta, phi):
     pt = Point()
     sp = math.sin(phi)

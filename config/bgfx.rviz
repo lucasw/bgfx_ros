@@ -4,7 +4,7 @@ Panels:
     Name: Displays
     Property Tree Widget:
       Expanded:
-        - /Camera1
+        - /Light1
       Splitter Ratio: 0.5
     Tree Height: 360
   - Class: rviz/Selection
@@ -70,6 +70,8 @@ Visualization Manager:
           Value: true
         frame3:
           Value: true
+        light_frame:
+          Value: true
         map:
           Value: true
       Marker Scale: 1
@@ -87,16 +89,18 @@ Visualization Manager:
             {}
           frame3:
             {}
+          light_frame:
+            {}
       Update Interval: 0
       Value: true
     - Class: rviz/InteractiveMarkers
       Enable Transparency: true
       Enabled: true
-      Name: InteractiveMarkers
+      Name: Light
       Show Axes: false
       Show Descriptions: true
       Show Visual Aids: false
-      Update Topic: /itf1/interactive_tf/update
+      Update Topic: /itf_light/interactive_tf/update
       Value: true
     - Class: rviz/Camera
       Enabled: true
@@ -110,7 +114,7 @@ Visualization Manager:
       Value: true
       Visibility:
         Grid: true
-        InteractiveMarkers: true
+        Light: true
         Marker: true
         TF: true
         Value: true
@@ -151,10 +155,10 @@ Visualization Manager:
         Z: 3.77382326
       Name: Current View
       Near Clip Distance: 0.00999999978
-      Pitch: 0.444796026
+      Pitch: -0.445204109
       Target Frame: <Fixed Frame>
       Value: Orbit (rviz)
-      Yaw: 4.25038815
+      Yaw: 4.02038383
     Saved: ~
 Window Geometry:
   Camera:
@@ -174,5 +178,5 @@ Window Geometry:
   Views:
     collapsed: true
   Width: 1457
-  X: 16
+  X: 15
   Y: 24

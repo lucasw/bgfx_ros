@@ -7,6 +7,7 @@
 // TODO(lucasw) this cause problems when lower in the include list
 #include <tf/transform_listener.h>
 
+#include <algorithm>
 #include <SDL2/SDL.h>
 #include <SDL2/SDL_syswm.h>
 // this has to come after SDL.h
@@ -87,7 +88,7 @@ void createShaderFromFile(const std::string path,
 class Mesh
 {
 public:
-  Mesh(const visualization_msgs::MarkerConstPtr& msg) :
+  explicit Mesh(const visualization_msgs::MarkerConstPtr& msg) :
     marker_(msg)
   {
     const uint8_t b = marker_->color.b * 255;
@@ -196,7 +197,6 @@ public:
       triangle_list_.push_back(5);
       triangle_list_.push_back(3);
       triangle_list_.push_back(7);
-
     }
     else if (marker_->type == visualization_msgs::Marker::TRIANGLE_LIST)
     {
@@ -256,7 +256,7 @@ public:
     bgfx::destroyIndexBuffer(ibh_);
     bgfx::destroyVertexBuffer(vbh_);
   }
-  // TODO triangle list or strip mode
+  // TODO(lucasw) triangle list or strip mode
 
   const visualization_msgs::MarkerConstPtr marker_;
 
@@ -516,7 +516,6 @@ public:
 
     if (bgfx_initted_)
     {
-
       for (auto const &ns_id_map : meshes_)
       {
         for (auto const &id_pair : ns_id_map.second)
@@ -753,7 +752,7 @@ public:
 
       ci->header.stamp = ros::Time::now();
       ci->header.frame_id = frame_id_;
-      // TODO(lwalter) later this will be have to determined earlier, has to be
+      // TODO(lucasw) later this will be have to determined earlier, has to be
       // slightly old in order for tf lookups to work
       cv_bridge::CvImage cv_image;
       cv_image.header.stamp = ci->header.stamp;
