@@ -14,9 +14,14 @@
 #include <bx/timer.h>
 #include <bx/fpumath.h>
 #include <bx/crtimpl.h>
-#include "entry/entry.h"
-#include "camera.h"
+// #include "entry/entry.h"
+// #include "camera.h"
 #include "imgui/imgui.h"
+
+#include <iomanip>
+#include <fstream>
+#include <iostream>
+#include <sstream>
 
 #define RENDERVIEW_SHADOWMAP_0_ID 1
 #define RENDERVIEW_SHADOWMAP_1_ID 2
@@ -37,6 +42,66 @@
 #define RENDERVIEW_DRAWDEPTH_1_ID 17
 #define RENDERVIEW_DRAWDEPTH_2_ID 18
 #define RENDERVIEW_DRAWDEPTH_3_ID 19
+
+void createShaderFromFile(const std::string path,
+    std::vector<uint8_t>& result,
+    bgfx::ShaderHandle& handle)
+{
+  std::ifstream ifs(path.c_str(), std::ios::binary | std::ios::in);
+  result = std::vector<uint8_t>((std::istreambuf_iterator<char>(ifs)),
+      std::istreambuf_iterator<char>());
+  // TODO(lucasw) bgfx_util.cpp loadMem appends this to the end, is it
+  // needed here?  Each bin already has a trailing 0
+  // result.push_back('\0');
+
+  const bgfx::Memory* mem = bgfx::makeRef(
+      reinterpret_cast<uint8_t*>(&result[0]), result.size());
+  std::cout << path << " shader size " << mem->size << std::endl;
+  for (size_t i = result.size() - 10; i < result.size(); ++i)
+  {
+    std::cout << "0x" << std::setfill('0') << std::setw(2)
+      << std::hex << static_cast<int>(result[i]) << std::dec << std::endl;
+  }
+  // TODO(lucasw) check if this worked
+  handle = bgfx::createShader(mem);
+}
+
+// bgfx::ProgramHandle loadProgram(const std::string vs_name, const std::string fs_name)
+bgfx::ProgramHandle loadProgram(const char* vs_name, const char* fs_name)
+{
+	bgfx::ShaderHandle vhandle;
+  std::vector<uint8_t> vresult;
+	createShaderFromFile(vs_name, vresult, vhandle);
+	bgfx::ShaderHandle fhandle;
+  std::vector<uint8_t> fresult;
+	createShaderFromFile(fs_name, fresult, fhandle);
+	bgfx::ProgramHandle program;
+  return bgfx::createProgram(vhandle, fhandle, true);
+}
+
+#if 0
+namespace entry
+{
+struct MouseState
+{
+	MouseState()
+		: m_mx(0)
+		, m_my(0)
+		, m_mz(0)
+	{
+		for (uint32_t ii = 0; ii < entry::MouseButton::Count; ++ii)
+		{
+			m_buttons[ii] = entry::MouseButton::None;
+		}
+	}
+
+	int32_t m_mx;
+	int32_t m_my;
+	int32_t m_mz;
+	uint8_t m_buttons[entry::MouseButton::Count];
+};
+}
+#endif
 
 uint32_t packUint32(uint8_t _x, uint8_t _y, uint8_t _z, uint8_t _w)
 {
@@ -878,13 +943,14 @@ struct Mesh
 		m_groups.push_back(group);
 	}
 
+#if 0
 	void load(const char* _filePath)
 	{
 #define BGFX_CHUNK_MAGIC_VB  BX_MAKEFOURCC('V', 'B', ' ', 0x1)
 #define BGFX_CHUNK_MAGIC_IB  BX_MAKEFOURCC('I', 'B', ' ', 0x0)
 #define BGFX_CHUNK_MAGIC_PRI BX_MAKEFOURCC('P', 'R', 'I', 0x0)
 
-		bx::FileReaderI* reader = entry::getFileReader();
+		bx::FileReaderI* reader = BX_NEW(g_allocator, FileReader);  // entry::getFileReader();
 		bx::open(reader, _filePath);
 
 		Group group;
@@ -967,6 +1033,7 @@ struct Mesh
 
 		bx::close(reader);
 	}
+#endif
 
 	void unload()
 	{
@@ -1310,9 +1377,9 @@ struct ShadowMapSettings
 #undef IMGUI_FLOAT_PARAM
 };
 
-int _main_(int _argc, char** _argv)
+int main(int _argc, char** _argv)
 {
-	Args args(_argc, _argv);
+	// Args args(_argc, _argv);
 
 	uint32_t debug = BGFX_DEBUG_TEXT;
 	uint32_t reset = BGFX_RESET_VSYNC;
@@ -1320,7 +1387,7 @@ int _main_(int _argc, char** _argv)
 	ViewState viewState(1280, 720);
 	ClearValues clearValues(0x00000000, 1.0f, 0);
 
-	bgfx::init(args.m_type, args.m_pciId);
+	bgfx::init(bgfx::RendererType::Count, BGFX_PCI_ID_NONE);
 	bgfx::reset(viewState.m_width, viewState.m_height, reset);
 
 	// Enable debug text.
@@ -1373,21 +1440,24 @@ int _main_(int _argc, char** _argv)
 	PosColorTexCoord0Vertex::init();
 
 	// Textures.
-	bgfx::TextureHandle texFigure     = loadTexture("textures/figure-rgba.dds");
-	bgfx::TextureHandle texFlare      = loadTexture("textures/flare.dds");
-	bgfx::TextureHandle texFieldstone = loadTexture("textures/fieldstone-rgba.dds");
+	bgfx::TextureHandle texFigure     = // loadTexture("textures/figure-rgba.dds");
+			bgfx::createTexture2D(128, 128, false, 1, bgfx::TextureFormat::BGRA8, 0);
+	bgfx::TextureHandle texFlare      = // loadTexture("textures/flare.dds");
+			bgfx::createTexture2D(128, 128, false, 1, bgfx::TextureFormat::BGRA8, 0);
+	bgfx::TextureHandle texFieldstone = // loadTexture("textures/fieldstone-rgba.dds");
+			bgfx::createTexture2D(128, 128, false, 1, bgfx::TextureFormat::BGRA8, 0);
 
 	// Meshes.
-	Mesh bunnyMesh;
-	Mesh treeMesh;
-	Mesh cubeMesh;
-	Mesh hollowcubeMesh;
+	// Mesh bunnyMesh;
+	// Mesh treeMesh;
+	// Mesh cubeMesh;
+	// Mesh hollowcubeMesh;
 	Mesh hplaneMesh;
 	Mesh vplaneMesh;
-	bunnyMesh.load("meshes/bunny.bin");
-	treeMesh.load("meshes/tree.bin");
-	cubeMesh.load("meshes/cube.bin");
-	hollowcubeMesh.load("meshes/hollowcube.bin");
+	// bunnyMesh.load("meshes/bunny.bin");
+	// treeMesh.load("meshes/tree.bin");
+	// cubeMesh.load("meshes/cube.bin");
+	// hollowcubeMesh.load("meshes/hollowcube.bin");
 	hplaneMesh.load(s_hplaneVertices, BX_COUNTOF(s_hplaneVertices), PosNormalTexcoordDecl, s_planeIndices, BX_COUNTOF(s_planeIndices) );
 	vplaneMesh.load(s_vplaneVertices, BX_COUNTOF(s_vplaneVertices), PosNormalTexcoordDecl, s_planeIndices, BX_COUNTOF(s_planeIndices) );
 
@@ -1947,9 +2017,9 @@ int _main_(int _argc, char** _argv)
 
 	// Setup camera.
 	float initialPos[3] = { 0.0f, 60.0f, -105.0f };
-	cameraCreate();
-	cameraSetPosition(initialPos);
-	cameraSetVerticalAngle(-0.45f);
+	// cameraCreate();
+	// cameraSetPosition(initialPos);
+	// cameraSetVerticalAngle(-0.45f);
 
 	// Set view and projection matrices.
 	const float camFovy    = 60.0f;
@@ -1959,7 +2029,7 @@ int _main_(int _argc, char** _argv)
 	const float projHeight = 1.0f/tanf(bx::toRad(camFovy)*0.5f);
 	const float projWidth  = projHeight * camAspect;
 	bx::mtxProj(viewState.m_proj, camFovy, camAspect, camNear, camFar);
-	cameraGetViewMtx(viewState.m_view);
+	// cameraGetViewMtx(viewState.m_view);
 
 	float timeAccumulatorLight = 0.0f;
 	float timeAccumulatorScene = 0.0f;
@@ -1967,18 +2037,19 @@ int _main_(int _argc, char** _argv)
 	entry::MouseState mouseState;
 	uint32_t width;
 	uint32_t height;
-	while (!entry::processEvents(width, height, debug, reset, &mouseState) )
+	while (true)  // !entry::processEvents(width, height, debug, reset, &mouseState) )
 	{
 		viewState.m_width  = uint16_t(width);
 		viewState.m_height = uint16_t(height);
 
 		// Imgui.
-		imguiBeginFrame(mouseState.m_mx
-			, mouseState.m_my
-			, (mouseState.m_buttons[entry::MouseButton::Left  ] ? IMGUI_MBUT_LEFT   : 0)
-			| (mouseState.m_buttons[entry::MouseButton::Right ] ? IMGUI_MBUT_RIGHT  : 0)
-			| (mouseState.m_buttons[entry::MouseButton::Middle] ? IMGUI_MBUT_MIDDLE : 0)
-			, mouseState.m_mz
+		imguiBeginFrame(0  // mouseState.m_mx
+			, 0  // mouseState.m_my
+			//, (mouseState.m_buttons[entry::MouseButton::Left  ] ? IMGUI_MBUT_LEFT   : 0)
+			// | (mouseState.m_buttons[entry::MouseButton::Right ] ? IMGUI_MBUT_RIGHT  : 0)
+			// | (mouseState.m_buttons[entry::MouseButton::Middle] ? IMGUI_MBUT_MIDDLE : 0)
+			, 0
+			, 0  // mouseState.m_mz
 			, viewState.m_width
 			, viewState.m_height
 			);
@@ -2155,10 +2226,10 @@ int _main_(int _argc, char** _argv)
 		bgfx::dbgTextPrintf(0, 3, 0x0f, "Frame: % 7.3f[ms]", double(frameTime)*toMs);
 
 		// Update camera.
-		cameraUpdate(deltaTime, mouseState);
+		// cameraUpdate(deltaTime, mouseState);
 
 		// Update view mtx.
-		cameraGetViewMtx(viewState.m_view);
+		// cameraGetViewMtx(viewState.m_view);
 
 		// Update lights.
 		pointLight.computeViewSpaceComponents(viewState.m_view);
@@ -2777,6 +2848,7 @@ int _main_(int _argc, char** _argv)
 						);
 
 				// Bunny.
+        #if 0
 				bunnyMesh.submit(viewId
 						, mtxBunny
 						, *currentSmSettings->m_progPack
@@ -2806,6 +2878,7 @@ int _main_(int _argc, char** _argv)
 							, s_renderStates[renderStateIndex]
 							);
 				}
+        #endif
 			}
 		}
 
@@ -2983,6 +3056,7 @@ int _main_(int _argc, char** _argv)
 					);
 
 			// Bunny.
+      #if 0
 			if (LightType::DirectionalLight != settings.m_lightType)
 			{
 				bx::mtxMul(lightMtx, mtxBunny, mtxShadow);
@@ -3032,6 +3106,7 @@ int _main_(int _argc, char** _argv)
 						, true
 						);
 			}
+      #endif
 
 			// Lights.
 			if (LightType::SpotLight == settings.m_lightType || LightType::PointLight == settings.m_lightType)
@@ -3135,10 +3210,10 @@ int _main_(int _argc, char** _argv)
 
 	}
 
-	bunnyMesh.unload();
-	treeMesh.unload();
-	cubeMesh.unload();
-	hollowcubeMesh.unload();
+	// bunnyMesh.unload();
+	// treeMesh.unload();
+	// cubeMesh.unload();
+	// hollowcubeMesh.unload();
 	hplaneMesh.unload();
 	vplaneMesh.unload();
 
@@ -3162,7 +3237,7 @@ int _main_(int _argc, char** _argv)
 
 	s_uniforms.destroy();
 
-	cameraDestroy();
+	// cameraDestroy();
 	imguiDestroy();
 
 	// Shutdown bgfx.

@@ -182,13 +182,13 @@ endforeach (FS ${FRAGMENT_SHADERS})
 add_executable(shadowmaps src/shadowmaps/shadowmaps.cpp
   ${VERTEX_SHADERS_BIN}
   ${FRAGMENT_SHADERS_BIN}
-  ${BGFX_DIR}/examples/common/bgfx_utils.cpp
+  # ${BGFX_DIR}/examples/common/bgfx_utils.cpp
   ${BGFX_DIR}/3rdparty/ocornut-imgui/imgui.cpp
   ${BGFX_DIR}/3rdparty/ib-compress/indexbufferdecompression.cpp
   ${BGFX_DIR}/3rdparty/ocornut-imgui/imgui_draw.cpp
   ${BGFX_DIR}/examples/common/imgui/ocornut_imgui.cpp
   ${BGFX_DIR}/examples/common/imgui/imgui.cpp
-  ${BGFX_DIR}/examples/common/camera.cpp
+  # ${BGFX_DIR}/examples/common/camera.cpp
   # ${BGFX_DIR}/examples/common/entry/entry.cpp
   # ${BGFX_DIR}/examples/common/entry/entry_x11.cpp
   # ${BGFX_DIR}/examples/common/entry/input.cpp
