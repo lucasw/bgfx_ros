@@ -3,7 +3,7 @@
  * License: https://github.com/bkaradzic/bgfx#license-bsd-2-clause
  */
 
-#include "common.sh"
+#include "sm_common.sh"
 
 uniform vec4 u_params0;
 uniform vec4 u_params1;

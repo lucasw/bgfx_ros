@@ -6,7 +6,7 @@ $output v_position
  * License: https://github.com/bkaradzic/bgfx#license-bsd-2-clause
  */
 
-#include "../common/common.sh"
+#include <bgfx_shader.sh>
 
 void main()
 {

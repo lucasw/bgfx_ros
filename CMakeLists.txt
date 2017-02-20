@@ -52,6 +52,8 @@ add_custom_command(OUTPUT vs_cubes.bin PRE_LINK
 
 include_directories(
   ${BGFX_DIR}/include
+  ${BGFX_DIR}/examples/common
+  ${BGFX_DIR}/3rdparty
   ${BX_DIR}/include
 	${SDL2_INCLUDE_DIRS} # ${SDL2IMAGE_INCLUDE_DIRS}
   ${catkin_INCLUDE_DIRS}
@@ -149,37 +151,61 @@ set(VERTEX_SHADERS
 	vs_shadowmaps_vblur
 )
 
-foreach (VERTEX_SHADER ${VERTEX_SHADERS})
-add_custom_command(OUTPUT ${VERTEX_SHADER}.bin PRE_LINK
-  COMMAND ${BGFX_DIR}/.build/linux64_gcc/bin/shadercRelease -f ${CMAKE_CURRENT_LIST_DIR}/src/shadowmaps/${VERTEX_SHADER}.sc -i ${BGFX_DIR}/src/shadowmaps -o ${CMAKE_CURRENT_SOURCE_DIR}/src/shadowmaps/${VERTEX_SHADER}.bin --varyingdef ${CMAKE_CURRENT_LIST_DIR}/src/shadowmaps/varying.def.sc --platform linux -p 120 --type vertex
-  DEPENDS ${CMAKE_CURRENT_LIST_DIR}/src/shadowmaps/varying.def.sc ${CMAKE_CURRENT_LIST_DIR}/src/shadowmaps/${VERTEX_SHADER}
-  COMMENT "Vertex Shader"
+foreach (VS ${VERTEX_SHADERS})
+add_custom_command(OUTPUT ${VS}.bin PRE_LINK
+  COMMAND ${BGFX_DIR}/.build/linux64_gcc/bin/shadercRelease -f ${CMAKE_CURRENT_LIST_DIR}/src/shadowmaps/${VS}.sc -i ${BGFX_DIR}/src -o ${CMAKE_CURRENT_SOURCE_DIR}/src/shadowmaps/${VS}.bin --varyingdef ${CMAKE_CURRENT_LIST_DIR}/src/shadowmaps/varying.def.sc --platform linux -p 120 --type vertex
+  DEPENDS ${CMAKE_CURRENT_LIST_DIR}/src/shadowmaps/varying.def.sc ${CMAKE_CURRENT_LIST_DIR}/src/shadowmaps/${VS}.sc
+  COMMENT "Vertex Shader ${VS}"
 )
-endforeach (VERTEX_SHADER ${VERTEX_SHADERS})
+endforeach (VS ${VERTEX_SHADERS})
 
 set (VERTEX_SHADERS_BIN "")
-foreach (VERTEX_SHADER ${VERTEX_SHADERS})
-list(APPEND VERTEX_SHADERS_BIN ${VERTEX_SHADER}.bin)
-endforeach (VERTEX_SHADER ${VERTEX_SHADERS})
+foreach (VS ${VERTEX_SHADERS})
+list(APPEND VERTEX_SHADERS_BIN ${VS}.bin)
+endforeach (VS ${VERTEX_SHADERS})
 
 ## 
-foreach (FRAGMENT_SHADER ${FRAGMENT_SHADERS})
-add_custom_command(OUTPUT ${FRAGMENT_SHADER}.bin PRE_LINK
-  COMMAND ${BGFX_DIR}/.build/linux64_gcc/bin/shadercRelease -f ${CMAKE_CURRENT_SOURCE_DIR}/src/shadowmaps/${FRAGMENT_SHADER}.sc -i ${BGFX_DIR}/src/shadowmaps -o ${CMAKE_CURRENT_SOURCE_DIR}/src/shadowmaps/${FRAGMENT_SHADER}.bin --varyingdef ${CMAKE_CURRENT_SOURCE_DIR}/src/shadowmaps/varying.def.sc --platform linux -p 120 --type fragment
-  DEPENDS ${CMAKE_CURRENT_SOURCE_DIR}/src/shadowmaps/varying.def.sc ${CMAKE_CURRENT_SOURCE_DIR}/src/shadowmaps/${FRAGMENT_SHADER}.sc
-  COMMENT "Fragment Shader"
+foreach (FS ${FRAGMENT_SHADERS})
+add_custom_command(OUTPUT ${FS}.bin PRE_LINK
+  COMMAND ${BGFX_DIR}/.build/linux64_gcc/bin/shadercRelease -f ${CMAKE_CURRENT_SOURCE_DIR}/src/shadowmaps/${FS}.sc -i ${BGFX_DIR}/src -i ${BGFX_DIR}/examples/common -i ${CMAKE_CURRENT_SOURCE_DIR}/src/shadowmaps -o ${CMAKE_CURRENT_SOURCE_DIR}/src/shadowmaps/${FS}.bin --varyingdef ${CMAKE_CURRENT_SOURCE_DIR}/src/shadowmaps/varying.def.sc --platform linux -p 120 --type fragment
+  DEPENDS ${CMAKE_CURRENT_SOURCE_DIR}/src/shadowmaps/varying.def.sc ${CMAKE_CURRENT_SOURCE_DIR}/src/shadowmaps/${FS}.sc
+  COMMENT "Fragment Shader ${FS}"
   )
-endforeach (FRAGMENT_SHADER ${FRAGMENT_SHADERS})
+endforeach (FS ${FRAGMENT_SHADERS})
 
 set (FRAGMENT_SHADERS_BIN "")
-foreach (FRAGMENT_SHADER ${FRAGMENT_SHADERS})
-list(APPEND FRAGMENT_SHADERS_BIN ${FRAGMENT_SHADER}.bin)
-endforeach (FRAGMENT_SHADER ${FRAGMENT_SHADERS})
+foreach (FS ${FRAGMENT_SHADERS})
+list(APPEND FRAGMENT_SHADERS_BIN ${FS}.bin)
+endforeach (FS ${FRAGMENT_SHADERS})
 
 
 add_executable(shadowmaps src/shadowmaps/shadowmaps.cpp
   ${VERTEX_SHADERS_BIN}
   ${FRAGMENT_SHADERS_BIN}
+  ${BGFX_DIR}/examples/common/bgfx_utils.cpp
+  ${BGFX_DIR}/3rdparty/ocornut-imgui/imgui.cpp
+  ${BGFX_DIR}/3rdparty/ib-compress/indexbufferdecompression.cpp
+  ${BGFX_DIR}/3rdparty/ocornut-imgui/imgui_draw.cpp
+  ${BGFX_DIR}/examples/common/imgui/ocornut_imgui.cpp
+  ${BGFX_DIR}/examples/common/imgui/imgui.cpp
+  ${BGFX_DIR}/examples/common/camera.cpp
+  # ${BGFX_DIR}/examples/common/entry/entry.cpp
+  # ${BGFX_DIR}/examples/common/entry/entry_x11.cpp
+  # ${BGFX_DIR}/examples/common/entry/input.cpp
+  # ${BGFX_DIR}/examples/common/entry/cmd.cpp
+  ${BGFX_DIR}/examples/common/nanovg/nanovg.cpp
+  ${BGFX_DIR}/examples/common/nanovg/nanovg_bgfx.cpp
+)
+
+target_link_libraries(shadowmaps
+  ${catkin_LIBRARIES}
+  ${bx_release}
+  # opengl has to come after bgfx
+  bgfx-shared-libRelease
+  dl
+  X11
+	${SDL2_LIBRARIES}  # ${SDL2IMAGE_LIBRARIES}
+  ${OPENGL_LIBRARIES}
 )
 
 ###
