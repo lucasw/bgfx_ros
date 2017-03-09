@@ -61,13 +61,13 @@ void createShaderFromFile(const std::string path,
       reinterpret_cast<uint8_t*>(&result[0]), result.size());
   std::cout << path << " shader size " << mem->size << " "
       << result.size() << std::endl;
-  #if 0
-  for (size_t i = result.size() - 10; (i > 0) && (i < result.size()); ++i)
+  for (size_t i = 0; (i < 3) && (i < result.size()); ++i)
   {
     std::cout << "0x" << std::setfill('0') << std::setw(2)
-      << std::hex << static_cast<int>(result[i]) << std::dec << std::endl;
+      << std::hex << static_cast<int>(result[i]) << std::dec
+      << " " << static_cast<char>(result[i])
+      << std::endl;
   }
-  #endif
   // TODO(lucasw) check if this worked
   handle = bgfx::createShader(mem);
 }

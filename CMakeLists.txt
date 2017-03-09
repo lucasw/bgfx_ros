@@ -39,22 +39,25 @@ set(BX_DIR $ENV{HOME}/other/bx CACHE PATH "location of bx directory")
 if (CMAKE_BUILD_TYPE MATCHES Debug)
 find_library(BX_LIBRARY libbxDebug.a ${BGFX_DIR}/.build/linux64_gcc/bin)
 set(BGFX_LIBRARIES bgfx-shared-libDebug ${BX_LIBRARY})
+set(BGFX_SHADERC ${BGFX_DIR}/.build/linux64_gcc/bin/shadercDebug)
 else (CMAKE_BUILD_TYPE MATCHES Debug)
 find_library(BX_LIBRARY libbxRelease.a ${BGFX_DIR}/.build/linux64_gcc/bin)
 set(BGFX_LIBRARIES bgfx-shared-libRelease ${BX_LIBRARY})
+set(BGFX_SHADERC ${BGFX_DIR}/.build/linux64_gcc/bin/shadercRelease)
 endif (CMAKE_BUILD_TYPE MATCHES Debug)
 message("BGFX_LIBRARIES" ${BGFX_LIBRARIES})
+message("BGFX_SHADERC" ${BGFX_SHADERC})
 
 # Build shaders
 #  ~/other/bgfx/.build/linux64_gcc/bin/shadercDebug -f fs_cubes.sc -i $HOME/other/bgfx/src -o fs_cubes.bin --varyingdef ./varying.def.sc --platform linux -p 120 --type fragment
 add_custom_command(OUTPUT fs_cubes.bin PRE_LINK
-  COMMAND ${BGFX_DIR}/.build/linux64_gcc/bin/shadercRelease -f ${CMAKE_CURRENT_SOURCE_DIR}/src/fs_cubes.sc -i ${BGFX_DIR}/src -o ${CMAKE_CURRENT_SOURCE_DIR}/src/fs_cubes.bin --varyingdef ${CMAKE_CURRENT_SOURCE_DIR}/src/varying.def.sc --platform linux -p 120 --type fragment
+  COMMAND ${BGFX_SHADERC} -f ${CMAKE_CURRENT_SOURCE_DIR}/src/fs_cubes.sc -i ${BGFX_DIR}/src -o ${CMAKE_CURRENT_SOURCE_DIR}/src/fs_cubes.bin --varyingdef ${CMAKE_CURRENT_SOURCE_DIR}/src/varying.def.sc --platform linux -p 120 --type fragment
   DEPENDS ${CMAKE_CURRENT_SOURCE_DIR}/src/varying.def.sc ${CMAKE_CURRENT_SOURCE_DIR}/src/fs_cubes.sc
   COMMENT "Fragment Shader"
   )
 #  ~/other/bgfx/.build/linux64_gcc/bin/shadercDebug -f vs_cubes.sc -i $HOME/other/bgfx/src -o vs_cubes.bin --varyingdef ./varying.def.sc --platform linux -p 120 --type vertex
 add_custom_command(OUTPUT vs_cubes.bin PRE_LINK
-  COMMAND ${BGFX_DIR}/.build/linux64_gcc/bin/shadercRelease -f ${CMAKE_CURRENT_LIST_DIR}/src/vs_cubes.sc -i ${BGFX_DIR}/src -o ${CMAKE_CURRENT_SOURCE_DIR}/src/vs_cubes.bin --varyingdef ${CMAKE_CURRENT_LIST_DIR}/src/varying.def.sc --platform linux -p 120 --type vertex
+  COMMAND ${BGFX_SHADERC} -f ${CMAKE_CURRENT_LIST_DIR}/src/vs_cubes.sc -i ${BGFX_DIR}/src -o ${CMAKE_CURRENT_SOURCE_DIR}/src/vs_cubes.bin --varyingdef ${CMAKE_CURRENT_LIST_DIR}/src/varying.def.sc --platform linux -p 120 --type vertex
   DEPENDS ${CMAKE_CURRENT_LIST_DIR}/src/varying.def.sc ${CMAKE_CURRENT_LIST_DIR}/src/vs_cubes.sc
   COMMENT "Vertex Shader"
   )
@@ -146,7 +149,7 @@ set(VERTEX_SHADERS
 
 foreach (VS ${VERTEX_SHADERS})
 add_custom_command(OUTPUT ${VS}.bin PRE_LINK
-  COMMAND ${BGFX_DIR}/.build/linux64_gcc/bin/shadercRelease -f ${CMAKE_CURRENT_LIST_DIR}/src/shadowmaps/${VS}.sc -i ${BGFX_DIR}/src -o ${CMAKE_CURRENT_SOURCE_DIR}/src/shadowmaps/${VS}.bin --varyingdef ${CMAKE_CURRENT_LIST_DIR}/src/shadowmaps/varying.def.sc --platform linux -p 120 --type vertex
+  COMMAND ${BGFX_SHADERC} -f ${CMAKE_CURRENT_LIST_DIR}/src/shadowmaps/${VS}.sc -i ${BGFX_DIR}/src -o ${CMAKE_CURRENT_SOURCE_DIR}/src/shadowmaps/${VS}.bin --varyingdef ${CMAKE_CURRENT_LIST_DIR}/src/shadowmaps/varying.def.sc --platform linux -p 120 --type vertex
   DEPENDS ${CMAKE_CURRENT_LIST_DIR}/src/shadowmaps/varying.def.sc ${CMAKE_CURRENT_LIST_DIR}/src/shadowmaps/${VS}.sc
   COMMENT "Vertex Shader ${VS}"
 )
@@ -160,7 +163,7 @@ endforeach (VS ${VERTEX_SHADERS})
 ## 
 foreach (FS ${FRAGMENT_SHADERS})
 add_custom_command(OUTPUT ${FS}.bin PRE_LINK
-  COMMAND ${BGFX_DIR}/.build/linux64_gcc/bin/shadercRelease -f ${CMAKE_CURRENT_SOURCE_DIR}/src/shadowmaps/${FS}.sc -i ${BGFX_DIR}/src -i ${BGFX_DIR}/examples/common -i ${CMAKE_CURRENT_SOURCE_DIR}/src/shadowmaps -o ${CMAKE_CURRENT_SOURCE_DIR}/src/shadowmaps/${FS}.bin --varyingdef ${CMAKE_CURRENT_SOURCE_DIR}/src/shadowmaps/varying.def.sc --platform linux -p 120 --type fragment
+  COMMAND ${BGFX_SHADERC} -f ${CMAKE_CURRENT_SOURCE_DIR}/src/shadowmaps/${FS}.sc -i ${BGFX_DIR}/src -i ${BGFX_DIR}/examples/common -i ${CMAKE_CURRENT_SOURCE_DIR}/src/shadowmaps -o ${CMAKE_CURRENT_SOURCE_DIR}/src/shadowmaps/${FS}.bin --varyingdef ${CMAKE_CURRENT_SOURCE_DIR}/src/shadowmaps/varying.def.sc --platform linux -p 120 --type fragment
   DEPENDS ${CMAKE_CURRENT_SOURCE_DIR}/src/shadowmaps/varying.def.sc ${CMAKE_CURRENT_SOURCE_DIR}/src/shadowmaps/${FS}.sc
   COMMENT "Fragment Shader ${FS}"
   )
