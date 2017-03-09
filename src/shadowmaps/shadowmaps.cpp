@@ -18,8 +18,11 @@
 // #include "camera.h"
 #include "imgui/imgui.h"
 
-#include <iomanip>
+#include <SDL2/SDL.h>
+#include <SDL2/SDL_syswm.h>
+#include <bgfx/platform.h>
 #include <fstream>
+#include <iomanip>
 #include <iostream>
 #include <sstream>
 
@@ -56,27 +59,36 @@ void createShaderFromFile(const std::string path,
 
   const bgfx::Memory* mem = bgfx::makeRef(
       reinterpret_cast<uint8_t*>(&result[0]), result.size());
-  std::cout << path << " shader size " << mem->size << std::endl;
-  for (size_t i = result.size() - 10; i < result.size(); ++i)
+  std::cout << path << " shader size " << mem->size << " "
+      << result.size() << std::endl;
+  #if 0
+  for (size_t i = result.size() - 10; (i > 0) && (i < result.size()); ++i)
   {
     std::cout << "0x" << std::setfill('0') << std::setw(2)
       << std::hex << static_cast<int>(result[i]) << std::dec << std::endl;
   }
+  #endif
   // TODO(lucasw) check if this worked
   handle = bgfx::createShader(mem);
 }
 
-// bgfx::ProgramHandle loadProgram(const std::string vs_name, const std::string fs_name)
-bgfx::ProgramHandle loadProgram(const char* vs_name, const char* fs_name)
+bgfx::ProgramHandle loadProgram(const std::string vs_name, const std::string fs_name)
 {
 	bgfx::ShaderHandle vhandle;
   std::vector<uint8_t> vresult;
-	createShaderFromFile(vs_name, vresult, vhandle);
+	createShaderFromFile(vs_name + ".bin", vresult, vhandle);
 	bgfx::ShaderHandle fhandle;
   std::vector<uint8_t> fresult;
-	createShaderFromFile(fs_name, fresult, fhandle);
+	createShaderFromFile(fs_name + ".bin", fresult, fhandle);
 	bgfx::ProgramHandle program;
   return bgfx::createProgram(vhandle, fhandle, true);
+}
+
+// TODO(lucasw) not having this results in
+// undefined reference to `loadProgram(char const*, char const*)'
+bgfx::ProgramHandle loadProgram(const char* vs_name, const char* fs_name)
+{
+  return loadProgram(std::string(vs_name), std::string(fs_name));
 }
 
 #if 0
@@ -1387,7 +1399,31 @@ int main(int _argc, char** _argv)
 	ViewState viewState(1280, 720);
 	ClearValues clearValues(0x00000000, 1.0f, 0);
 
-	bgfx::init(bgfx::RendererType::Count, BGFX_PCI_ID_NONE);
+  SDL_Window* window = SDL_CreateWindow("bgfx_ros", SDL_WINDOWPOS_UNDEFINED,
+      SDL_WINDOWPOS_UNDEFINED, viewState.m_width, viewState.m_height,
+      SDL_WINDOW_SHOWN | SDL_WINDOW_RESIZABLE);
+
+  SDL_SysWMinfo wmi;
+  SDL_VERSION(&wmi.version);
+  if (!SDL_GetWindowWMInfo(window, &wmi) )
+  {
+    std::cerr << "couldn't get wm info" << std::endl;
+    return 1;
+  }
+
+  bgfx::PlatformData pd;
+  pd.ndt          = wmi.info.x11.display;
+  pd.nwh          = reinterpret_cast<void*>((uintptr_t)wmi.info.x11.window);
+  pd.context      = NULL;
+  pd.backBuffer   = NULL;
+  pd.backBufferDS = NULL;
+  bgfx::setPlatformData(pd);
+
+	if (!bgfx::init(bgfx::RendererType::Count, BGFX_PCI_ID_NONE))
+  {
+    std::cerr << "bgfx init failed" << std::endl;
+    return -1;
+  }
 	bgfx::reset(viewState.m_width, viewState.m_height, reset);
 
 	// Enable debug text.

@@ -36,6 +36,15 @@ catkin_package(
 set(BGFX_DIR $ENV{HOME}/other/bgfx CACHE PATH "location of bgfx directory")
 set(BX_DIR $ENV{HOME}/other/bx CACHE PATH "location of bx directory")
 
+if (CMAKE_BUILD_TYPE MATCHES Debug)
+find_library(BX_LIBRARY libbxDebug.a ${BGFX_DIR}/.build/linux64_gcc/bin)
+set(BGFX_LIBRARIES bgfx-shared-libDebug ${BX_LIBRARY})
+else (CMAKE_BUILD_TYPE MATCHES Debug)
+find_library(BX_LIBRARY libbxRelease.a ${BGFX_DIR}/.build/linux64_gcc/bin)
+set(BGFX_LIBRARIES bgfx-shared-libRelease ${BX_LIBRARY})
+endif (CMAKE_BUILD_TYPE MATCHES Debug)
+message("BGFX_LIBRARIES" ${BGFX_LIBRARIES})
+
 # Build shaders
 #  ~/other/bgfx/.build/linux64_gcc/bin/shadercDebug -f fs_cubes.sc -i $HOME/other/bgfx/src -o fs_cubes.bin --varyingdef ./varying.def.sc --platform linux -p 120 --type fragment
 add_custom_command(OUTPUT fs_cubes.bin PRE_LINK
@@ -66,27 +75,11 @@ link_directories(
 
 add_executable(bgfx_ros src/bgfx_ros.cpp fs_cubes.bin vs_cubes.bin)
 
-find_library(bx_release libbxRelease.a ${BGFX_DIR}/.build/linux64_gcc/bin)
 
 target_link_libraries(bgfx_ros
   ${catkin_LIBRARIES}
-  ${bx_release}
   # opengl has to come after bgfx
-  bgfx-shared-libRelease
-	${SDL2_LIBRARIES}  # ${SDL2IMAGE_LIBRARIES}
-  ${OPENGL_LIBRARIES}
-)
-
-add_executable(bgfx_ros_debug src/bgfx_ros.cpp fs_cubes.bin vs_cubes.bin)
-
-# add_dependencies(bgfx_ros bgfx_ros_gencpp)
-
-find_library(bx_debug libbxDebug.a ${BGFX_DIR}/.build/linux64_gcc/bin)
-target_link_libraries(bgfx_ros_debug
-  ${catkin_LIBRARIES}
-  ${bx_debug}
-  # opengl has to come after bgfx
-  bgfx-shared-libDebug
+  ${BGFX_LIBRARIES}
 	${SDL2_LIBRARIES}  # ${SDL2IMAGE_LIBRARIES}
   ${OPENGL_LIBRARIES}
 )
@@ -197,23 +190,22 @@ add_executable(shadowmaps src/shadowmaps/shadowmaps.cpp
   ${BGFX_DIR}/examples/common/nanovg/nanovg_bgfx.cpp
 )
 
+
 target_link_libraries(shadowmaps
   ${catkin_LIBRARIES}
-  ${bx_release}
   # opengl has to come after bgfx
-  bgfx-shared-libRelease
+  ${BGFX_LIBRARIES}
   dl
   X11
 	${SDL2_LIBRARIES}  # ${SDL2IMAGE_LIBRARIES}
   ${OPENGL_LIBRARIES}
 )
-
 ###
 
 install(FILES src/fs_cubes.bin src/vs_cubes.bin
   DESTINATION ${CATKIN_PACKAGE_SHARE_DESTINATION}/src
 )
-install(TARGETS bgfx_ros bgfx_ros_debug
+install(TARGETS bgfx_ros
     ARCHIVE DESTINATION ${CATKIN_PACKAGE_LIB_DESTINATION}
     LIBRARY DESTINATION ${CATKIN_PACKAGE_LIB_DESTINATION}
     RUNTIME DESTINATION ${CATKIN_PACKAGE_BIN_DESTINATION}
