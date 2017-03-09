@@ -24,6 +24,7 @@
 #include <fstream>
 #include <iomanip>
 #include <iostream>
+#include <map>
 #include <sstream>
 
 #define RENDERVIEW_SHADOWMAP_0_ID 1
@@ -70,25 +71,6 @@ void createShaderFromFile(const std::string path,
   }
   // TODO(lucasw) check if this worked
   handle = bgfx::createShader(mem);
-}
-
-bgfx::ProgramHandle loadProgram(const std::string vs_name, const std::string fs_name)
-{
-	bgfx::ShaderHandle vhandle;
-  std::vector<uint8_t> vresult;
-	createShaderFromFile(vs_name + ".bin", vresult, vhandle);
-	bgfx::ShaderHandle fhandle;
-  std::vector<uint8_t> fresult;
-	createShaderFromFile(fs_name + ".bin", fresult, fhandle);
-	bgfx::ProgramHandle program;
-  return bgfx::createProgram(vhandle, fhandle, true);
-}
-
-// TODO(lucasw) not having this results in
-// undefined reference to `loadProgram(char const*, char const*)'
-bgfx::ProgramHandle loadProgram(const char* vs_name, const char* fs_name)
-{
-  return loadProgram(std::string(vs_name), std::string(fs_name));
 }
 
 #if 0
@@ -1253,6 +1235,26 @@ void splitFrustum(float* _splits, uint8_t _numSplits, float _near, float _far, f
 
 struct Programs
 {
+  std::map<std::string, std::vector<uint8_t> > vresult_;
+  std::map<std::string, std::vector<uint8_t> > fresult_;
+  std::map<std::string, bgfx::ShaderHandle> vhandle_;
+  std::map<std::string, bgfx::ShaderHandle> fhandle_;
+
+  // TODO(lucasw) using std::string args results in
+  // undefined reference to `loadProgram(char const*, char const*)'
+  bgfx::ProgramHandle loadProgram(const char* vs_name_c, const char* fs_name_c)
+  {
+    const std::string vs_name = vs_name_c;
+    const std::string fs_name = fs_name_c;
+
+    if (vresult_[vs_name].size() == 0)
+	    createShaderFromFile(vs_name + ".bin", vresult_[vs_name], vhandle_[vs_name]);
+    if (fresult_[fs_name].size() == 0)
+	    createShaderFromFile(fs_name + ".bin", fresult_[fs_name], fhandle_[fs_name]);
+
+    return bgfx::createProgram(vhandle_[vs_name], fhandle_[fs_name], true);
+  }
+
 	void init()
 	{
 		// Misc.
