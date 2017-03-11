@@ -1240,12 +1240,23 @@ void splitFrustum(float* _splits, uint8_t _numSplits, float _near, float _far, f
 	_splits[numSlices-1] = _far;
 }
 
+struct ProgramData
+{
+  std::vector<uint8_t> vresult_;
+  std::vector<uint8_t> fresult_;
+  bgfx::ShaderHandle vhandle_;
+  bgfx::ShaderHandle fhandle_;
+};
+
 struct Programs
 {
+  #if 0
   std::map<std::string, std::vector<uint8_t> > vresult_;
   std::map<std::string, std::vector<uint8_t> > fresult_;
   std::map<std::string, bgfx::ShaderHandle> vhandle_;
   std::map<std::string, bgfx::ShaderHandle> fhandle_;
+  #endif
+  std::vector<ProgramData> programs_;
 
   // TODO(lucasw) using std::string args results in
   // undefined reference to `loadProgram(char const*, char const*)'
@@ -1254,6 +1265,7 @@ struct Programs
     const std::string vs_name = vs_name_c;
     const std::string fs_name = fs_name_c;
 
+    #if 0
     if (vresult_[vs_name].size() == 0)
     {
 	    if (!createShaderFromFile(vs_name + ".bin", vresult_[vs_name], vhandle_[vs_name]))
@@ -1266,6 +1278,14 @@ struct Programs
     }
 
     handle = bgfx::createProgram(vhandle_[vs_name], fhandle_[fs_name], true);
+    #endif
+    ProgramData new_program;
+    programs_.push_back(new_program);
+    const int ind = programs_.size() - 1;
+	  if (!createShaderFromFile(vs_name + ".bin", programs_[ind].vresult_, programs_[ind].vhandle_))
+      return false;
+	  if (!createShaderFromFile(fs_name + ".bin", programs_[ind].fresult_, programs_[ind].fhandle_))
+      return false;
     return true;
   }
 
@@ -2129,8 +2149,10 @@ int main(int _argc, char** _argv)
 	entry::MouseState mouseState;
 	uint32_t width;
 	uint32_t height;
+  std::cout << "entering main loop" << std::endl;
 	while (true)  // !entry::processEvents(width, height, debug, reset, &mouseState) )
 	{
+    std::cout << "begin loop" << std::endl;
 		viewState.m_width  = uint16_t(width);
 		viewState.m_height = uint16_t(height);
 
@@ -3296,12 +3318,14 @@ int main(int _argc, char** _argv)
 			s_rtBlur = bgfx::createFrameBuffer(currentShadowMapSize, currentShadowMapSize, bgfx::TextureFormat::BGRA8);
 		}
 
+    std::cout << "frame" << std::endl;
 		// Advance to next frame. Rendering thread will be kicked to
 		// process submitted rendering primitives.
 		bgfx::frame();
 
     SDL_Delay(30);
     SDL_PollEvent(NULL);
+    std::cout << "end of loop" << std::endl;
 	}
 
 	// bunnyMesh.unload();
