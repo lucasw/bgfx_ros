@@ -1286,7 +1286,8 @@ struct Programs
       return false;
 	  if (!createShaderFromFile(fs_name + ".bin", programs_[ind].fresult_, programs_[ind].fhandle_))
       return false;
-    return true;
+    handle = bgfx::createProgram(programs_[ind].vhandle_, programs_[ind].fhandle_, true);
+    return isValid(handle);
   }
 
 	bool init()
@@ -2142,17 +2143,20 @@ int main(int _argc, char** _argv)
 	const float projWidth  = projHeight * camAspect;
 	bx::mtxProj(viewState.m_proj, camFovy, camAspect, camNear, camFar);
 	// cameraGetViewMtx(viewState.m_view);
+  float cam_at[3]  = { 0.0f, 0.0f,   0.0f };
+  float cam_eye[3] = { 0.0f, 2.0f, -29.0f };
+  bx::mtxLookAt(viewState.m_view, cam_eye, cam_at);
 
 	float timeAccumulatorLight = 0.0f;
 	float timeAccumulatorScene = 0.0f;
 
-	entry::MouseState mouseState;
+	// entry::MouseState mouseState;
 	uint32_t width;
 	uint32_t height;
   std::cout << "entering main loop" << std::endl;
-	while (true)  // !entry::processEvents(width, height, debug, reset, &mouseState) )
+	// while (true)  // !entry::processEvents(width, height, debug, reset, &mouseState) )
+  for (size_t i = 0; i < 150; ++i)
 	{
-    std::cout << "begin loop" << std::endl;
 		viewState.m_width  = uint16_t(width);
 		viewState.m_height = uint16_t(height);
 
@@ -2338,12 +2342,14 @@ int main(int _argc, char** _argv)
 		bgfx::dbgTextPrintf(0, 1, 0x4f, "bgfx/examples/16-shadowmaps");
 		bgfx::dbgTextPrintf(0, 2, 0x6f, "Description: Shadow maps example.");
 		bgfx::dbgTextPrintf(0, 3, 0x0f, "Frame: % 7.3f[ms]", double(frameTime)*toMs);
+    std::cout << "frame time " << double(frameTime)*toMs << std::endl;
 
 		// Update camera.
 		// cameraUpdate(deltaTime, mouseState);
 
 		// Update view mtx.
 		// cameraGetViewMtx(viewState.m_view);
+    bx::mtxLookAt(viewState.m_view, cam_eye, cam_at);
 
 		// Update lights.
 		pointLight.computeViewSpaceComponents(viewState.m_view);
@@ -3318,14 +3324,12 @@ int main(int _argc, char** _argv)
 			s_rtBlur = bgfx::createFrameBuffer(currentShadowMapSize, currentShadowMapSize, bgfx::TextureFormat::BGRA8);
 		}
 
-    std::cout << "frame" << std::endl;
 		// Advance to next frame. Rendering thread will be kicked to
 		// process submitted rendering primitives.
 		bgfx::frame();
 
     SDL_Delay(30);
     SDL_PollEvent(NULL);
-    std::cout << "end of loop" << std::endl;
 	}
 
 	// bunnyMesh.unload();
