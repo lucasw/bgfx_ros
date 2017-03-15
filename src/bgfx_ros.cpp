@@ -308,6 +308,22 @@ class BgfxRos
   std::string light_frame_;
   bgfx::UniformHandle light_dir_handle_;
 
+	bool flipV;
+	bgfx::UniformHandle;
+	bgfx::UniformHandle;
+	bgfx::UniformHandle;
+	bgfx::UniformHandle;
+	float depthScale;
+	float depthOffset;
+	float depthScaleOffset[4];
+
+	bgfx::ProgramHandle progShadow;
+  bgfx::ProgramHandle progMesh;
+  bgfx::TextureHandle shadowMapTexture;
+  bgfx::FrameBufferHandle shadowMapFB;
+
+	meshState* state[2];
+
   float at_[3];
   float eye_[3];
   uint32_t clear_color_;
@@ -452,6 +468,96 @@ public:
       ROS_ERROR_STREAM("can't read back texture");
       return false;
     }
+
+		flipV = false
+			|| renderer == bgfx::RendererType::OpenGL
+			|| renderer == bgfx::RendererType::OpenGLES;
+
+		u_shadowMap = bgfx::createUniform("u_shadowMap", bgfx::UniformType::Int1);
+		u_lightPos  = bgfx::createUniform("u_lightPos",  bgfx::UniformType::Vec4);
+		u_lightMtx  = bgfx::createUniform("u_lightMtx",  bgfx::UniformType::Mat4);
+		// When using GL clip space depth range [-1, 1] and packing depth into color buffer, we need to
+		// adjust the depth range to be [0, 1] for writing to the color buffer
+		u_depthScaleOffset = bgfx::createUniform("u_depthScaleOffset",  bgfx::UniformType::Vec4);
+		depthScale = flipV ? 0.5f : 1.0f;
+		depthOffset = flipV ? 0.5f : 0.0f;
+		depthScaleOffset[4] = {depthScale, depthOffset, 0.0f, 0.0f};
+		bgfx::setUniform(u_depthScaleOffset, depthScaleOffset);
+
+		const bool shadowSamplerSupported = 0 != (bgfx::getCaps()->caps->supported &
+				BGFX_CAPS_TEXTURE_COMPARE_LEQUAL);
+
+		if (shadowSamplerSupported)
+		{
+			// Depth textures and shadow samplers are supported.
+			progShadow = loadProgram("vs_sms_shadow", "fs_sms_shadow");
+
+			createShaderFromFile(path + "vs_sms_shadow.bin", vresult_, vhandle_);
+			createShaderFromFile(path + "fs_sms_shadow.bin", fresult_, fhandle_);
+			progShadow = bgfx::createProgram(vhandle_, fhandle_, destroy_shader);
+			if (!isValid(program_))
+			{
+				ROS_ERROR_STREAM("creating shader program failed");
+				return false;
+			}
+
+			progMesh   = loadProgram("vs_sms_mesh",   "fs_sms_mesh");
+
+			shadowMapTexture = bgfx::createTexture2D(shadowMapSize, shadowMapSize,
+					false, 1, bgfx::TextureFormat::D16,
+					BGFX_TEXTURE_RT | BGFX_TEXTURE_COMPARE_LEQUAL);
+			bgfx::TextureHandle fbtextures[] = { shadowMapTexture };
+			shadowMapFB = bgfx::createFrameBuffer(BX_COUNTOF(fbtextures), fbtextures, true);
+		}
+		else
+		{
+			// Depth textures and shadow samplers are not supported. Use float
+			// depth packing into color buffer instead.
+			progShadow = loadProgram("vs_sms_shadow_pd", "fs_sms_shadow_pd");
+			progMesh   = loadProgram("vs_sms_mesh",      "fs_sms_mesh_pd");
+
+			shadowMapTexture = bgfx::createTexture2D(shadowMapSize, shadowMapSize,
+					false, 1, bgfx::TextureFormat::BGRA8, BGFX_TEXTURE_RT);
+			bgfx::TextureHandle fbtextures[] =
+			{
+				shadowMapTexture,
+				bgfx::createTexture2D(shadowMapSize, shadowMapSize, false, 1,
+						bgfx::TextureFormat::D16, BGFX_TEXTURE_RT_WRITE_ONLY),
+			};
+			shadowMapFB = bgfx::createFrameBuffer(BX_COUNTOF(fbtextures), fbtextures, true);
+		}
+
+		state[0] = meshStateCreate();
+		state[0]->m_state = 0
+					| BGFX_STATE_RGB_WRITE
+					| BGFX_STATE_ALPHA_WRITE
+					| BGFX_STATE_DEPTH_WRITE
+					| BGFX_STATE_DEPTH_TEST_LESS
+					| BGFX_STATE_CULL_CCW
+					| BGFX_STATE_MSAA
+					;
+		state[0]->m_program = progShadow;
+		state[0]->m_viewId  = RENDER_SHADOW_PASS_ID;
+		state[0]->m_numTextures = 0;
+
+		state[1] = meshStateCreate();
+		state[1]->m_state = 0
+					| BGFX_STATE_RGB_WRITE
+					| BGFX_STATE_ALPHA_WRITE
+					| BGFX_STATE_DEPTH_WRITE
+					| BGFX_STATE_DEPTH_TEST_LESS
+					| BGFX_STATE_CULL_CCW
+					| BGFX_STATE_MSAA
+					;
+		state[1]->m_program = progMesh;
+		state[1]->m_viewId  = RENDER_SCENE_PASS_ID;
+		state[1]->m_numTextures = 1;
+		state[1]->m_textures[0].m_flags = UINT32_MAX;
+		state[1]->m_textures[0].m_stage = 0;
+		state[1]->m_textures[0].m_sampler = u_shadowMap;
+		state[1]->m_textures[0].m_texture = shadowMapTexture;
+
+		#if 0
     const bool has_mips = false;
     const uint16_t num_layers = 1;
     read_back_texture_ = bgfx::createTexture2D(width_, height_,
@@ -485,6 +591,7 @@ public:
     }
 
     light_dir_handle_ = bgfx::createUniform("light_dir", bgfx::UniformType::Vec4);
+		#endif
 
     frame_buffer_handle_ = bgfx::createFrameBuffer(2, frame_buffer_texture_);
     if (frame_buffer_handle_.idx == bgfx::invalidHandle)
