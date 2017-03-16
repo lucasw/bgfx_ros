@@ -34,6 +34,23 @@
 #include <vector>
 #include <visualization_msgs/Marker.h>
 
+struct MeshState
+{
+  struct Texture
+  {
+    uint32_t            m_flags;
+    bgfx::UniformHandle m_sampler;
+    bgfx::TextureHandle m_texture;
+    uint8_t             m_stage;
+  };
+
+  Texture             m_textures[4];
+  uint64_t            m_state;
+  bgfx::ProgramHandle m_program;
+  uint8_t             m_numTextures;
+  uint8_t             m_viewId;
+};
+
 
 struct PosNormalColorVertex
 {
@@ -294,10 +311,10 @@ class BgfxRos
   // namespace and id keys
   std::map<std::string, std::map<int, Mesh*> > meshes_;
 
-  std::vector<uint8_t> vresult_;
-  std::vector<uint8_t> fresult_;
-  bgfx::ShaderHandle vhandle_;
-  bgfx::ShaderHandle fhandle_;
+  std::map<std::string, std::vector<uint8_t> > vresult_;
+  std::map<std::string, std::vector<uint8_t> > fresult_;
+  std::map<std::string, bgfx::ShaderHandle> vhandle_;
+  std::map<std::string, bgfx::ShaderHandle> fhandle_;
 
   bgfx::ProgramHandle program_;
 
@@ -307,6 +324,10 @@ class BgfxRos
 
   std::string light_frame_;
   bgfx::UniformHandle light_dir_handle_;
+
+	// shadowmap
+	const uint8_t RENDER_SHADOW_PASS_ID = 0;
+	const uint8_t RENDER_SCENE_PASS_ID = 1;
 
 	bool flipV;
 	bgfx::UniformHandle;
@@ -322,7 +343,7 @@ class BgfxRos
   bgfx::TextureHandle shadowMapTexture;
   bgfx::FrameBufferHandle shadowMapFB;
 
-	meshState* state[2];
+	MeshState* state[2];
 
   float at_[3];
   float eye_[3];
@@ -393,6 +414,25 @@ public:
     return true;
   }
 
+  bool loadProgram(const std::string vs_name, const std::string fs_name,
+      bgfx::ProgramHandle& handle)
+  {
+    if (vresult_[vs_name].size() == 0)
+    {
+      if (!createShaderFromFile(vs_name + ".bin", vresult_[vs_name], vhandle_[vs_name]))
+        return false;
+    }
+    if (fresult_[fs_name].size() == 0)
+    {
+      if (!createShaderFromFile(fs_name + ".bin", fresult_[fs_name], fhandle_[fs_name]))
+        return false;
+    }
+
+    handle = bgfx::createProgram(vhandle_[vs_name], fhandle_[fs_name], true);
+
+    return isValid(handle);
+  }
+
   bool bgfxInit()
   {
     window_ = SDL_CreateWindow("bgfx_ros", SDL_WINDOWPOS_UNDEFINED,
@@ -439,18 +479,6 @@ public:
     path += "/src/";
     ROS_INFO_STREAM("loading shaders from " << path);
 
-    createShaderFromFile(path + "vs_cubes.bin", vresult_, vhandle_);
-
-    createShaderFromFile(path + "fs_cubes.bin", fresult_, fhandle_);
-
-    const bool destroy_shader = true;
-    program_ = bgfx::createProgram(vhandle_, fhandle_, destroy_shader);
-    if (!isValid(program_))
-    {
-      ROS_ERROR_STREAM("creating shader program failed");
-      return false;
-    }
-
     ///////////////
     PosNormalColorVertex::init();
 
@@ -490,18 +518,16 @@ public:
 		if (shadowSamplerSupported)
 		{
 			// Depth textures and shadow samplers are supported.
-			progShadow = loadProgram("vs_sms_shadow", "fs_sms_shadow");
-
-			createShaderFromFile(path + "vs_sms_shadow.bin", vresult_, vhandle_);
-			createShaderFromFile(path + "fs_sms_shadow.bin", fresult_, fhandle_);
-			progShadow = bgfx::createProgram(vhandle_, fhandle_, destroy_shader);
-			if (!isValid(program_))
+      if (!loadProgram(path + "vs_sms_shadow", path + "fs_sms_shadow", progShadow);
 			{
 				ROS_ERROR_STREAM("creating shader program failed");
 				return false;
 			}
-
-			progMesh   = loadProgram("vs_sms_mesh",   "fs_sms_mesh");
+      if (!loadProgram(path + "vs_sms_mesh", path + "fs_sms_mesh", progMesh);
+			{
+				ROS_ERROR_STREAM("creating shader program failed");
+				return false;
+			}
 
 			shadowMapTexture = bgfx::createTexture2D(shadowMapSize, shadowMapSize,
 					false, 1, bgfx::TextureFormat::D16,
@@ -513,8 +539,16 @@ public:
 		{
 			// Depth textures and shadow samplers are not supported. Use float
 			// depth packing into color buffer instead.
-			progShadow = loadProgram("vs_sms_shadow_pd", "fs_sms_shadow_pd");
-			progMesh   = loadProgram("vs_sms_mesh",      "fs_sms_mesh_pd");
+      if (!loadProgram(path + "vs_sms_shadow_pd", path + "fs_sms_shadow_pd", progShadow);
+			{
+				ROS_ERROR_STREAM("creating shader program failed");
+				return false;
+			}
+      if (!loadProgram(path + "vs_sms_mesh", path + "fs_sms_mesh_pd", progMesh);
+			{
+				ROS_ERROR_STREAM("creating shader program failed");
+				return false;
+			}
 
 			shadowMapTexture = bgfx::createTexture2D(shadowMapSize, shadowMapSize,
 					false, 1, bgfx::TextureFormat::BGRA8, BGFX_TEXTURE_RT);
@@ -533,7 +567,7 @@ public:
 					| BGFX_STATE_ALPHA_WRITE
 					| BGFX_STATE_DEPTH_WRITE
 					| BGFX_STATE_DEPTH_TEST_LESS
-					| BGFX_STATE_CULL_CCW
+					| BGFX_STATE_CULL_CW
 					| BGFX_STATE_MSAA
 					;
 		state[0]->m_program = progShadow;
@@ -546,7 +580,7 @@ public:
 					| BGFX_STATE_ALPHA_WRITE
 					| BGFX_STATE_DEPTH_WRITE
 					| BGFX_STATE_DEPTH_TEST_LESS
-					| BGFX_STATE_CULL_CCW
+					| BGFX_STATE_CULL_CW
 					| BGFX_STATE_MSAA
 					;
 		state[1]->m_program = progMesh;
@@ -633,8 +667,8 @@ public:
           meshes_[ns].erase(id);
         }
       }
-      bgfx::destroyUniform(light_dir_handle_);
-      bgfx::destroyProgram(program_);
+      // bgfx::destroyUniform(light_dir_handle_);
+      // bgfx::destroyProgram(program_);
       bgfx::shutdown();
     }
     initted_ = false;
@@ -768,6 +802,66 @@ public:
       light_dir[3] = 1.0;
     }
 
+		/////////////////////////////////////////
+		// setup the shadowmap
+    float lightView[16];
+    float lightProj[16];
+
+    eye[0] = -light_dir[0];
+    eye[1] = -light_dir[1];
+    eye[2] = -light_dir[2];
+
+    at[0] = 0.0f;
+    at[1] = 0.0f;
+    at[2] = 0.0f;
+
+    bx::mtxLookAt(lightView, eye, at);
+
+    const float area = 30.0f;
+    bx::mtxOrtho(lightProj, -area, area, -area, area, -100.0f, 100.0f, 0.0f, flipV);
+
+    bgfx::setViewRect(RENDER_SHADOW_PASS_ID, 0, 0, shadowMapSize, shadowMapSize);
+    bgfx::setViewFrameBuffer(RENDER_SHADOW_PASS_ID, shadowMapFB);
+    bgfx::setViewTransform(RENDER_SHADOW_PASS_ID, lightView, lightProj);
+
+    bgfx::setViewRect(RENDER_SCENE_PASS_ID, 0, 0, uint16_t(width), uint16_t(height) );
+    bgfx::setViewTransform(RENDER_SCENE_PASS_ID, view, proj);
+
+    // Clear backbuffer and shadowmap framebuffer at beginning.
+    bgfx::setViewClear(RENDER_SHADOW_PASS_ID
+      , BGFX_CLEAR_COLOR | BGFX_CLEAR_DEPTH
+      , 0x303030ff, 1.0f, 0
+      );
+
+    bgfx::setViewClear(RENDER_SCENE_PASS_ID
+      , BGFX_CLEAR_COLOR | BGFX_CLEAR_DEPTH
+      , 0x303030ff, 1.0f, 0
+      );
+
+    // Render.
+    float mtxShadow[16];
+    float lightMtx[16];
+
+    const float sy = flipV ? 0.5f : -0.5f;
+    const float mtxCrop[16] =
+    {
+      0.5f, 0.0f, 0.0f, 0.0f,
+      0.0f,   sy, 0.0f, 0.0f,
+      0.0f, 0.0f, depthScale, 0.0f,
+      0.5f, 0.5f, depthOffset, 1.0f,
+    };
+
+		float mtxTmp[16];
+    bx::mtxMul(mtxTmp,    lightProj, mtxCrop);
+    bx::mtxMul(mtxShadow, lightView, mtxTmp);
+
+		// TODO(lucasw)
+		// Will the simple shadows not cast shadows on other objects, or
+		// only a special floor object in the example?
+		// If that is the case then can't really use this.
+    // bx::mtxMul(lightMtx, mtxFloor, mtxShadow);
+		////////////////////////////////////////////
+
     for (auto const &ns_id : meshes_)
     {
       for (auto const &id_mesh : ns_id.second)
@@ -817,26 +911,27 @@ public:
         // print4x4Mat(mat, "pre mat");
         float res[16];
         bx::mtxMul(res, mat, mtx);
+				bx::mtxMul(lightMtx, res, mtxShadow);
 
-        // TODO(lucasw) does this have to be done inside this loop?
-        bgfx::setUniform(light_dir_handle_, light_dir);
-        // Set model matrix for rendering.
-        bgfx::setTransform(res);
+				for (size_t = 0; i < 2; ++i)
+				{
+					// TODO(lucasw) does this have to be done inside this loop?
+					// bgfx::setUniform(u_lightPos, light_dir);
+					// Set model matrix for rendering.
+					bgfx::setTransform(res);
 
-        bgfx::setVertexBuffer(mesh->vbh_);
-        bgfx::setIndexBuffer(mesh->ibh_);
+					// TODO(lucasw) textures as in bgfx_util submit(
 
-        // Set render states.
-        bgfx::setState(0
-            | BGFX_STATE_RGB_WRITE
-            | BGFX_STATE_ALPHA_WRITE
-            | BGFX_STATE_DEPTH_TEST_LESS
-            | BGFX_STATE_DEPTH_WRITE
-            | BGFX_STATE_CULL_CW
-            | BGFX_STATE_MSAA);
-          // | BGFX_STATE_PT_TRILIST    // this doesn't exist - is it the default?
-        // Submit primitive for rendering to view 0.
-        bgfx::submit(0, program_);
+					bgfx::setVertexBuffer(mesh->vbh_);
+					bgfx::setIndexBuffer(mesh->ibh_);
+
+					// Set render states.
+					bgfx::setState(state[i]->m_state);
+					// Submit primitive for rendering to view 0.
+					// bgfx::submit(0, program_);
+					bgfx::setUniform(u_lightMtx, lightMtx);
+					bgfx::submit(state[i]->viewId, state[i]->m_program);
+				}
       }
     }
 
