@@ -5,7 +5,8 @@ $input v_position
  * License: https://github.com/bkaradzic/bgfx#license-bsd-2-clause
  */
 
-#include "../common/common.sh"
+#include <bgfx_shader.sh>
+#include "shaderlib.sh"
 
 uniform vec4 u_depthScaleOffset;  // for GL, map depth values into [0, 1] range
 #define u_depthScale u_depthScaleOffset.x

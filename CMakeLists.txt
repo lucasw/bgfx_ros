@@ -48,19 +48,6 @@ endif (CMAKE_BUILD_TYPE MATCHES Debug)
 message("BGFX_LIBRARIES" ${BGFX_LIBRARIES})
 message("BGFX_SHADERC" ${BGFX_SHADERC})
 
-# Build shaders
-#  ~/other/bgfx/.build/linux64_gcc/bin/shadercDebug -f fs_cubes.sc -i $HOME/other/bgfx/src -o fs_cubes.bin --varyingdef ./varying.def.sc --platform linux -p 120 --type fragment
-add_custom_command(OUTPUT fs_cubes.bin PRE_LINK
-  COMMAND ${BGFX_SHADERC} -f ${CMAKE_CURRENT_SOURCE_DIR}/src/fs_cubes.sc -i ${BGFX_DIR}/src -o ${CMAKE_CURRENT_SOURCE_DIR}/src/fs_cubes.bin --varyingdef ${CMAKE_CURRENT_SOURCE_DIR}/src/varying.def.sc --platform linux -p 120 --type fragment
-  DEPENDS ${CMAKE_CURRENT_SOURCE_DIR}/src/varying.def.sc ${CMAKE_CURRENT_SOURCE_DIR}/src/fs_cubes.sc
-  COMMENT "Fragment Shader"
-  )
-#  ~/other/bgfx/.build/linux64_gcc/bin/shadercDebug -f vs_cubes.sc -i $HOME/other/bgfx/src -o vs_cubes.bin --varyingdef ./varying.def.sc --platform linux -p 120 --type vertex
-add_custom_command(OUTPUT vs_cubes.bin PRE_LINK
-  COMMAND ${BGFX_SHADERC} -f ${CMAKE_CURRENT_LIST_DIR}/src/vs_cubes.sc -i ${BGFX_DIR}/src -o ${CMAKE_CURRENT_SOURCE_DIR}/src/vs_cubes.bin --varyingdef ${CMAKE_CURRENT_LIST_DIR}/src/varying.def.sc --platform linux -p 120 --type vertex
-  DEPENDS ${CMAKE_CURRENT_LIST_DIR}/src/varying.def.sc ${CMAKE_CURRENT_LIST_DIR}/src/vs_cubes.sc
-  COMMENT "Vertex Shader"
-  )
 
 include_directories(
   ${BGFX_DIR}/include
@@ -76,8 +63,49 @@ link_directories(
   ${BGFX_DIR}/.build/linux64_gcc/bin
 )
 
-add_executable(bgfx_ros src/bgfx_ros.cpp fs_cubes.bin vs_cubes.bin)
+# vertex
+set(VERTEX_SHADERS
+  vs_cubes
+  vs_sms_mesh
+  vs_sms_shadow_pd
+  vs_sms_shadow
+)
 
+set (VERTEX_SHADERS_BIN "")
+foreach (VS ${VERTEX_SHADERS})
+add_custom_command(OUTPUT ${VS}.bin PRE_LINK
+  COMMAND ${BGFX_SHADERC} -f ${CMAKE_CURRENT_LIST_DIR}/src/${VS}.sc -i ${BGFX_DIR}/src -o ${CMAKE_CURRENT_SOURCE_DIR}/src/${VS}.bin --varyingdef ${CMAKE_CURRENT_LIST_DIR}/src/varying.def.sc --platform linux -p 120 --type vertex
+  DEPENDS ${CMAKE_CURRENT_LIST_DIR}/src/varying.def.sc ${CMAKE_CURRENT_LIST_DIR}/src/${VS}.sc
+  COMMENT "Vertex Shader ${VS}"
+)
+list(APPEND VERTEX_SHADERS_BIN ${VS}.bin)
+endforeach (VS ${VERTEX_SHADERS})
+
+# fragment
+set(FRAGMENT_SHADERS
+  fs_cubes
+  fs_sms_mesh_pd
+  fs_sms_mesh
+  fs_sms_shadow_pd
+  fs_sms_shadow
+)
+
+set (FRAGMENT_SHADERS_BIN "")
+foreach (FS ${FRAGMENT_SHADERS})
+add_custom_command(OUTPUT ${FS}.bin PRE_LINK
+  COMMAND ${BGFX_SHADERC} -f ${CMAKE_CURRENT_SOURCE_DIR}/src/${FS}.sc -i ${BGFX_DIR}/src -i ${BGFX_DIR}/examples/common -i ${CMAKE_CURRENT_SOURCE_DIR}/src/shadowmaps -o ${CMAKE_CURRENT_SOURCE_DIR}/src/${FS}.bin --varyingdef ${CMAKE_CURRENT_SOURCE_DIR}/src/varying.def.sc --platform linux -p 120 --type fragment
+  DEPENDS ${CMAKE_CURRENT_SOURCE_DIR}/src/varying.def.sc ${CMAKE_CURRENT_SOURCE_DIR}/src/${FS}.sc
+  COMMENT "Fragment Shader ${FS}"
+  )
+list(APPEND FRAGMENT_SHADERS_BIN ${FS}.bin)
+endforeach (FS ${FRAGMENT_SHADERS})
+
+add_executable(
+  bgfx_ros
+  ${VERTEX_SHADERS_BIN}
+  ${FRAGMENT_SHADERS_BIN}
+  src/bgfx_ros.cpp
+)
 
 target_link_libraries(bgfx_ros
   ${catkin_LIBRARIES}
@@ -87,8 +115,9 @@ target_link_libraries(bgfx_ros
   ${OPENGL_LIBRARIES}
 )
 
+###############################################################################
 # shadow example
-set(FRAGMENT_SHADERS
+set(SM_FRAGMENT_SHADERS
 	fs_shadowmaps_color_black
 	fs_shadowmaps_color_lighting_esm_csm
 	fs_shadowmaps_color_lighting_esm_linear_csm
@@ -128,7 +157,7 @@ set(FRAGMENT_SHADERS
 	fs_shadowmaps_vblur_vsm
 )
 
-set(VERTEX_SHADERS
+set(SM_VERTEX_SHADERS
 	vs_shadowmaps_color_lighting_csm
 	vs_shadowmaps_color_lighting_linear_csm
 	vs_shadowmaps_color_lighting_linear_omni
@@ -147,7 +176,7 @@ set(VERTEX_SHADERS
 	vs_shadowmaps_vblur
 )
 
-foreach (VS ${VERTEX_SHADERS})
+foreach (VS ${SM_VERTEX_SHADERS})
 add_custom_command(OUTPUT ${VS}.bin PRE_LINK
   COMMAND ${BGFX_SHADERC} -f ${CMAKE_CURRENT_LIST_DIR}/src/shadowmaps/${VS}.sc -i ${BGFX_DIR}/src -o ${CMAKE_CURRENT_SOURCE_DIR}/src/shadowmaps/${VS}.bin --varyingdef ${CMAKE_CURRENT_LIST_DIR}/src/shadowmaps/varying.def.sc --platform linux -p 120 --type vertex
   DEPENDS ${CMAKE_CURRENT_LIST_DIR}/src/shadowmaps/varying.def.sc ${CMAKE_CURRENT_LIST_DIR}/src/shadowmaps/${VS}.sc
@@ -155,29 +184,29 @@ add_custom_command(OUTPUT ${VS}.bin PRE_LINK
 )
 endforeach (VS ${VERTEX_SHADERS})
 
-set (VERTEX_SHADERS_BIN "")
-foreach (VS ${VERTEX_SHADERS})
-list(APPEND VERTEX_SHADERS_BIN ${VS}.bin)
-endforeach (VS ${VERTEX_SHADERS})
+set (SM_VERTEX_SHADERS_BIN "")
+foreach (VS ${SM_VERTEX_SHADERS})
+list(APPEND SM_VERTEX_SHADERS_BIN ${VS}.bin)
+endforeach (VS ${SM_VERTEX_SHADERS})
 
 ## 
-foreach (FS ${FRAGMENT_SHADERS})
+foreach (FS ${SM_FRAGMENT_SHADERS})
 add_custom_command(OUTPUT ${FS}.bin PRE_LINK
   COMMAND ${BGFX_SHADERC} -f ${CMAKE_CURRENT_SOURCE_DIR}/src/shadowmaps/${FS}.sc -i ${BGFX_DIR}/src -i ${BGFX_DIR}/examples/common -i ${CMAKE_CURRENT_SOURCE_DIR}/src/shadowmaps -o ${CMAKE_CURRENT_SOURCE_DIR}/src/shadowmaps/${FS}.bin --varyingdef ${CMAKE_CURRENT_SOURCE_DIR}/src/shadowmaps/varying.def.sc --platform linux -p 120 --type fragment
   DEPENDS ${CMAKE_CURRENT_SOURCE_DIR}/src/shadowmaps/varying.def.sc ${CMAKE_CURRENT_SOURCE_DIR}/src/shadowmaps/${FS}.sc
   COMMENT "Fragment Shader ${FS}"
   )
-endforeach (FS ${FRAGMENT_SHADERS})
+endforeach (FS ${SM_FRAGMENT_SHADERS})
 
-set (FRAGMENT_SHADERS_BIN "")
-foreach (FS ${FRAGMENT_SHADERS})
-list(APPEND FRAGMENT_SHADERS_BIN ${FS}.bin)
-endforeach (FS ${FRAGMENT_SHADERS})
+set (SM_FRAGMENT_SHADERS_BIN "")
+foreach (FS ${SM_FRAGMENT_SHADERS})
+list(APPEND SM_FRAGMENT_SHADERS_BIN ${FS}.bin)
+endforeach (FS ${SM_FRAGMENT_SHADERS})
 
 
 add_executable(shadowmaps src/shadowmaps/shadowmaps.cpp
-  ${VERTEX_SHADERS_BIN}
-  ${FRAGMENT_SHADERS_BIN}
+  ${SM_VERTEX_SHADERS_BIN}
+  ${SM_FRAGMENT_SHADERS_BIN}
   # ${BGFX_DIR}/examples/common/bgfx_utils.cpp
   ${BGFX_DIR}/3rdparty/ocornut-imgui/imgui.cpp
   ${BGFX_DIR}/3rdparty/ib-compress/indexbufferdecompression.cpp

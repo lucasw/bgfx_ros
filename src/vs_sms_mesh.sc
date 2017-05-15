@@ -6,7 +6,7 @@ $output v_view, v_normal, v_shadowcoord
  * License: https://github.com/bkaradzic/bgfx#license-bsd-2-clause
  */
 
-#include "../common/common.sh"
+#include <bgfx_shader.sh>
 
 uniform mat4 u_lightMtx;
 

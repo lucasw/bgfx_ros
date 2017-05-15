@@ -3,7 +3,8 @@
  * License: https://github.com/bkaradzic/bgfx#license-bsd-2-clause
  */
 
-#include "../common/common.sh"
+#include <bgfx_shader.sh>
+#include "shaderlib.sh"
 
 uniform vec4 u_lightPos;
 #if SHADOW_PACKED_DEPTH

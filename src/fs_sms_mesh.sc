@@ -5,7 +5,7 @@ $input v_view, v_normal, v_shadowcoord
  * License: https://github.com/bkaradzic/bgfx#license-bsd-2-clause
  */
 
-#include "../common/common.sh"
+#include <bgfx_shader.sh>
 
 #define SHADOW_PACKED_DEPTH 0
 #include "fs_sms_shadow.sh"
