@@ -51,7 +51,6 @@ struct MeshState
   uint8_t             m_viewId;
 };
 
-
 struct PosNormalColorVertex
 {
   float x_;
@@ -78,7 +77,7 @@ struct PosNormalColorVertex
 
 bgfx::VertexDecl PosNormalColorVertex::decl_;
 
-void createShaderFromFile(const std::string path,
+bool createShaderFromFile(const std::string path,
     std::vector<uint8_t>& result,
     bgfx::ShaderHandle& handle)
 {
@@ -99,6 +98,8 @@ void createShaderFromFile(const std::string path,
   }
   // TODO(lucasw) check if this worked
   handle = bgfx::createShader(mem);
+
+  return true;
 }
 
 
@@ -330,13 +331,16 @@ class BgfxRos
 	const uint8_t RENDER_SCENE_PASS_ID = 1;
 
 	bool flipV;
-	bgfx::UniformHandle;
-	bgfx::UniformHandle;
-	bgfx::UniformHandle;
-	bgfx::UniformHandle;
+	bgfx::UniformHandle u_shadowMap;
+	bgfx::UniformHandle u_lightPos;
+	bgfx::UniformHandle u_lightMtx;
+	bgfx::UniformHandle u_depthScaleOffset;
 	float depthScale;
 	float depthOffset;
 	float depthScaleOffset[4];
+
+  // Render targets.
+  uint16_t shadowMapSize;
 
 	bgfx::ProgramHandle progShadow;
   bgfx::ProgramHandle progMesh;
@@ -497,6 +501,7 @@ public:
       return false;
     }
 
+    bgfx::RendererType::Enum renderer = bgfx::getRendererType();
 		flipV = false
 			|| renderer == bgfx::RendererType::OpenGL
 			|| renderer == bgfx::RendererType::OpenGLES;
@@ -509,26 +514,32 @@ public:
 		u_depthScaleOffset = bgfx::createUniform("u_depthScaleOffset",  bgfx::UniformType::Vec4);
 		depthScale = flipV ? 0.5f : 1.0f;
 		depthOffset = flipV ? 0.5f : 0.0f;
-		depthScaleOffset[4] = {depthScale, depthOffset, 0.0f, 0.0f};
+		depthScaleOffset[0] = depthScale;
+    depthScaleOffset[1] = depthOffset;
+    depthScaleOffset[2] = 0.0f;
+    depthScaleOffset[3] = 0.0f;
 		bgfx::setUniform(u_depthScaleOffset, depthScaleOffset);
 
-		const bool shadowSamplerSupported = 0 != (bgfx::getCaps()->caps->supported &
+    // Get renderer capabilities info.
+    const bgfx::Caps* caps = bgfx::getCaps();
+		const bool shadowSamplerSupported = 0 != (caps->supported &
 				BGFX_CAPS_TEXTURE_COMPARE_LEQUAL);
 
 		if (shadowSamplerSupported)
 		{
 			// Depth textures and shadow samplers are supported.
-      if (!loadProgram(path + "vs_sms_shadow", path + "fs_sms_shadow", progShadow);
+      if (!loadProgram(path + "vs_sms_shadow", path + "fs_sms_shadow", progShadow))
 			{
 				ROS_ERROR_STREAM("creating shader program failed");
 				return false;
 			}
-      if (!loadProgram(path + "vs_sms_mesh", path + "fs_sms_mesh", progMesh);
+      if (!loadProgram(path + "vs_sms_mesh", path + "fs_sms_mesh", progMesh))
 			{
 				ROS_ERROR_STREAM("creating shader program failed");
 				return false;
 			}
 
+      shadowMapSize = 512;
 			shadowMapTexture = bgfx::createTexture2D(shadowMapSize, shadowMapSize,
 					false, 1, bgfx::TextureFormat::D16,
 					BGFX_TEXTURE_RT | BGFX_TEXTURE_COMPARE_LEQUAL);
@@ -539,12 +550,12 @@ public:
 		{
 			// Depth textures and shadow samplers are not supported. Use float
 			// depth packing into color buffer instead.
-      if (!loadProgram(path + "vs_sms_shadow_pd", path + "fs_sms_shadow_pd", progShadow);
+      if (!loadProgram(path + "vs_sms_shadow_pd", path + "fs_sms_shadow_pd", progShadow))
 			{
 				ROS_ERROR_STREAM("creating shader program failed");
 				return false;
 			}
-      if (!loadProgram(path + "vs_sms_mesh", path + "fs_sms_mesh_pd", progMesh);
+      if (!loadProgram(path + "vs_sms_mesh", path + "fs_sms_mesh_pd", progMesh))
 			{
 				ROS_ERROR_STREAM("creating shader program failed");
 				return false;
@@ -561,7 +572,8 @@ public:
 			shadowMapFB = bgfx::createFrameBuffer(BX_COUNTOF(fbtextures), fbtextures, true);
 		}
 
-		state[0] = meshStateCreate();
+    // TODO(lucasw) delete these later
+		state[0] = new MeshState();
 		state[0]->m_state = 0
 					| BGFX_STATE_RGB_WRITE
 					| BGFX_STATE_ALPHA_WRITE
@@ -574,7 +586,7 @@ public:
 		state[0]->m_viewId  = RENDER_SHADOW_PASS_ID;
 		state[0]->m_numTextures = 0;
 
-		state[1] = meshStateCreate();
+		state[1] = new MeshState();
 		state[1]->m_state = 0
 					| BGFX_STATE_RGB_WRITE
 					| BGFX_STATE_ALPHA_WRITE
@@ -807,13 +819,15 @@ public:
     float lightView[16];
     float lightProj[16];
 
+    float eye[3];
     eye[0] = -light_dir[0];
     eye[1] = -light_dir[1];
     eye[2] = -light_dir[2];
 
-    at[0] = 0.0f;
-    at[1] = 0.0f;
-    at[2] = 0.0f;
+    float at[3];
+    at_[0] = 0.0f;
+    at_[1] = 0.0f;
+    at_[2] = 0.0f;
 
     bx::mtxLookAt(lightView, eye, at);
 
@@ -824,7 +838,7 @@ public:
     bgfx::setViewFrameBuffer(RENDER_SHADOW_PASS_ID, shadowMapFB);
     bgfx::setViewTransform(RENDER_SHADOW_PASS_ID, lightView, lightProj);
 
-    bgfx::setViewRect(RENDER_SCENE_PASS_ID, 0, 0, uint16_t(width), uint16_t(height) );
+    bgfx::setViewRect(RENDER_SCENE_PASS_ID, 0, 0, uint16_t(width_), uint16_t(height_) );
     bgfx::setViewTransform(RENDER_SCENE_PASS_ID, view, proj);
 
     // Clear backbuffer and shadowmap framebuffer at beginning.
@@ -913,7 +927,7 @@ public:
         bx::mtxMul(res, mat, mtx);
 				bx::mtxMul(lightMtx, res, mtxShadow);
 
-				for (size_t = 0; i < 2; ++i)
+				for (size_t i = 0; i < 2; ++i)
 				{
 					// TODO(lucasw) does this have to be done inside this loop?
 					// bgfx::setUniform(u_lightPos, light_dir);
@@ -930,7 +944,7 @@ public:
 					// Submit primitive for rendering to view 0.
 					// bgfx::submit(0, program_);
 					bgfx::setUniform(u_lightMtx, lightMtx);
-					bgfx::submit(state[i]->viewId, state[i]->m_program);
+					bgfx::submit(state[i]->m_viewId, state[i]->m_program);
 				}
       }
     }
