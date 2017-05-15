@@ -326,9 +326,9 @@ class BgfxRos
   std::string light_frame_;
   bgfx::UniformHandle light_dir_handle_;
 
-	// shadowmap
 	const uint8_t RENDER_SHADOW_PASS_ID = 0;
 	const uint8_t RENDER_SCENE_PASS_ID = 1;
+	const uint8_t BACKBUFFER_PASS_ID = 2;
 
 	bool flipV;
 	bgfx::UniformHandle u_shadowMap;
@@ -347,7 +347,7 @@ class BgfxRos
   bgfx::TextureHandle shadowMapTexture;
   bgfx::FrameBufferHandle shadowMapFB;
 
-	MeshState* state[2];
+	MeshState* mesh_state[2];
 
   float at_[3];
   float eye_[3];
@@ -470,7 +470,7 @@ public:
     bgfx::reset(width_, height_, reset_);
 
     bgfx::setDebug(BGFX_DEBUG_TEXT);
-    bgfx::setViewClear(0, BGFX_CLEAR_COLOR | BGFX_CLEAR_DEPTH,
+    bgfx::setViewClear(RENDER_SCENE_PASS_ID, BGFX_CLEAR_COLOR | BGFX_CLEAR_DEPTH,
         clear_color_, 1.0f, 0);
 
     ROS_INFO_STREAM(width_ << " " << height_ << " " << reset_);
@@ -538,6 +538,7 @@ public:
 				ROS_ERROR_STREAM("creating shader program failed");
 				return false;
 			}
+      ROS_INFO_STREAM("shadow sampler supported");
 
       shadowMapSize = 512;
 			shadowMapTexture = bgfx::createTexture2D(shadowMapSize, shadowMapSize,
@@ -560,6 +561,7 @@ public:
 				ROS_ERROR_STREAM("creating shader program failed");
 				return false;
 			}
+      ROS_INFO_STREAM("use float depth packing into color buffer instead of shadow sampler");
 
 			shadowMapTexture = bgfx::createTexture2D(shadowMapSize, shadowMapSize,
 					false, 1, bgfx::TextureFormat::BGRA8, BGFX_TEXTURE_RT);
@@ -572,9 +574,9 @@ public:
 			shadowMapFB = bgfx::createFrameBuffer(BX_COUNTOF(fbtextures), fbtextures, true);
 		}
 
-    // TODO(lucasw) delete these later
-		state[0] = new MeshState();
-		state[0]->m_state = 0
+    // TODO(lucasw) delete these when done with them
+		mesh_state[0] = new MeshState();
+		mesh_state[0]->m_state = 0
 					| BGFX_STATE_RGB_WRITE
 					| BGFX_STATE_ALPHA_WRITE
 					| BGFX_STATE_DEPTH_WRITE
@@ -582,12 +584,12 @@ public:
 					| BGFX_STATE_CULL_CW
 					| BGFX_STATE_MSAA
 					;
-		state[0]->m_program = progShadow;
-		state[0]->m_viewId  = RENDER_SHADOW_PASS_ID;
-		state[0]->m_numTextures = 0;
+		mesh_state[0]->m_program = progShadow;
+		mesh_state[0]->m_viewId  = RENDER_SHADOW_PASS_ID;
+		mesh_state[0]->m_numTextures = 0;
 
-		state[1] = new MeshState();
-		state[1]->m_state = 0
+		mesh_state[1] = new MeshState();
+		mesh_state[1]->m_state = 0
 					| BGFX_STATE_RGB_WRITE
 					| BGFX_STATE_ALPHA_WRITE
 					| BGFX_STATE_DEPTH_WRITE
@@ -595,13 +597,13 @@ public:
 					| BGFX_STATE_CULL_CW
 					| BGFX_STATE_MSAA
 					;
-		state[1]->m_program = progMesh;
-		state[1]->m_viewId  = RENDER_SCENE_PASS_ID;
-		state[1]->m_numTextures = 1;
-		state[1]->m_textures[0].m_flags = UINT32_MAX;
-		state[1]->m_textures[0].m_stage = 0;
-		state[1]->m_textures[0].m_sampler = u_shadowMap;
-		state[1]->m_textures[0].m_texture = shadowMapTexture;
+		mesh_state[1]->m_program = progMesh;
+		mesh_state[1]->m_viewId  = RENDER_SCENE_PASS_ID;
+		mesh_state[1]->m_numTextures = 1;
+		mesh_state[1]->m_textures[0].m_flags = UINT32_MAX;
+		mesh_state[1]->m_textures[0].m_stage = 0;
+		mesh_state[1]->m_textures[0].m_sampler = u_shadowMap;
+		mesh_state[1]->m_textures[0].m_texture = shadowMapTexture;
 
 		#if 0
     const bool has_mips = false;
@@ -724,6 +726,7 @@ public:
     {
       std::map<int, Mesh*> mesh_by_id;
       meshes_[msg->ns] = mesh_by_id;
+      ROS_INFO_STREAM(msg->header.frame_id << " " << msg->ns << " " << msg->id);
     }
     meshes_[msg->ns][msg->id] = new Mesh(msg);
   }
@@ -753,7 +756,11 @@ public:
 
   void update()
   {
-    if (!bgfx_initted_) return;
+    if (!bgfx_initted_)
+    {
+      ROS_ERROR("bgfx is not initialized");
+      return;
+    }
 
     {
       // TODO(lucasw) this doesn't appear on the texture image output,
@@ -764,6 +771,10 @@ public:
           0x8f, ss.str().c_str());
       ROS_DEBUG_STREAM(ss.str());
     }
+
+    bgfx::setViewName(RENDER_SHADOW_PASS_ID, "shaddow_pass_render");
+    bgfx::setViewRect(RENDER_SHADOW_PASS_ID, 0, 0, shadowMapSize, shadowMapSize);
+    bgfx::setViewFrameBuffer(RENDER_SHADOW_PASS_ID, shadowMapFB);
 
     // TODO(lucasw) allow every element of this matrix to be controlled
     // via topic or service call
@@ -785,20 +796,22 @@ public:
         static_cast<float>(width_) / static_cast<float>(height_), 0.1f, 100.0f);
     // TODO(lucasw) also want ability to set projection matrix
     // entirely from message
-    bgfx::setViewTransform(0, view, proj);
+    bgfx::setViewTransform(RENDER_SCENE_PASS_ID, view, proj);
 
-    // Set view 0 default viewport.
-    bgfx::setViewName(0, "bgfx_ros");
-    bgfx::setViewRect(0, 0, 0, bgfx::BackbufferRatio::Equal);
-    bgfx::setViewClear(0, BGFX_CLEAR_COLOR | BGFX_CLEAR_DEPTH,
+    // Set view viewport.
+    bgfx::setViewName(RENDER_SCENE_PASS_ID, "bgfx_ros");
+    // TODO(lucasw) why not sest to width_ and height_?
+    bgfx::setViewRect(RENDER_SCENE_PASS_ID, 0, 0, bgfx::BackbufferRatio::Equal);
+    bgfx::setViewClear(RENDER_SCENE_PASS_ID, BGFX_CLEAR_COLOR | BGFX_CLEAR_DEPTH,
         clear_color_, 1.0f, 0);
-    bgfx::setViewFrameBuffer(0, frame_buffer_handle_);
-    bgfx::touch(0);
+    bgfx::setViewFrameBuffer(RENDER_SCENE_PASS_ID, frame_buffer_handle_);
+    bgfx::touch(RENDER_SCENE_PASS_ID);
 
-    bgfx::setViewName(1, "backbuffer_render");
-    bgfx::setViewRect(1, 0, 0, bgfx::BackbufferRatio::Equal);
+    bgfx::setViewName(BACKBUFFER_PASS_ID, "backbuffer_render");
+    // TODO(lucasw) why not sest to width_ and height_?
+    bgfx::setViewRect(BACKBUFFER_PASS_ID, 0, 0, bgfx::BackbufferRatio::Equal);
     bgfx::FrameBufferHandle invalid = BGFX_INVALID_HANDLE;
-    bgfx::setViewFrameBuffer(1, invalid);
+    bgfx::setViewFrameBuffer(BACKBUFFER_PASS_ID, invalid);
 
     float light_dir[4];
     tf::StampedTransform light_transform;
@@ -816,30 +829,28 @@ public:
 
 		/////////////////////////////////////////
 		// setup the shadowmap
-    float lightView[16];
-    float lightProj[16];
-
     float eye[3];
     eye[0] = -light_dir[0];
     eye[1] = -light_dir[1];
     eye[2] = -light_dir[2];
 
     float at[3];
-    at_[0] = 0.0f;
-    at_[1] = 0.0f;
-    at_[2] = 0.0f;
+    at[0] = 0.0f;
+    at[1] = 0.0f;
+    at[2] = 0.0f;
 
+    float lightView[16];
     bx::mtxLookAt(lightView, eye, at);
 
     const float area = 30.0f;
+    float lightProj[16];
     bx::mtxOrtho(lightProj, -area, area, -area, area, -100.0f, 100.0f, 0.0f, flipV);
 
-    bgfx::setViewRect(RENDER_SHADOW_PASS_ID, 0, 0, shadowMapSize, shadowMapSize);
-    bgfx::setViewFrameBuffer(RENDER_SHADOW_PASS_ID, shadowMapFB);
     bgfx::setViewTransform(RENDER_SHADOW_PASS_ID, lightView, lightProj);
 
-    bgfx::setViewRect(RENDER_SCENE_PASS_ID, 0, 0, uint16_t(width_), uint16_t(height_) );
-    bgfx::setViewTransform(RENDER_SCENE_PASS_ID, view, proj);
+    // redundant
+    // bgfx::setViewRect(RENDER_SCENE_PASS_ID, 0, 0, uint16_t(width_), uint16_t(height_) );
+    // bgfx::setViewTransform(RENDER_SCENE_PASS_ID, view, proj);
 
     // Clear backbuffer and shadowmap framebuffer at beginning.
     bgfx::setViewClear(RENDER_SHADOW_PASS_ID
@@ -940,11 +951,11 @@ public:
 					bgfx::setIndexBuffer(mesh->ibh_);
 
 					// Set render states.
-					bgfx::setState(state[i]->m_state);
+					bgfx::setState(mesh_state[i]->m_state);
 					// Submit primitive for rendering to view 0.
 					// bgfx::submit(0, program_);
 					bgfx::setUniform(u_lightMtx, lightMtx);
-					bgfx::submit(state[i]->m_viewId, state[i]->m_program);
+					bgfx::submit(mesh_state[i]->m_viewId, mesh_state[i]->m_program);
 				}
       }
     }
@@ -952,8 +963,8 @@ public:
     // TODO(lucasw) does there need to be a isValid every update?
     if (bgfx::isValid(read_back_texture_))
     {
-      bgfx::touch(1);
-      bgfx::blit(1, read_back_texture_, 0, 0,
+      bgfx::touch(BACKBUFFER_PASS_ID);
+      bgfx::blit(BACKBUFFER_PASS_ID, read_back_texture_, 0, 0,
           // bgfx::getTexture(frame_buffer_handle_), 0, 0, width_, height_);
           frame_buffer_texture_[0], 0, 0, width_, height_);
       // toggle between the two image buffers
@@ -978,6 +989,10 @@ public:
       sensor_msgs::ImagePtr msg = cv_image.toImageMsg();
       cam_pub_.publish(*msg, *ci);
       ++buffer_ind_;
+    }
+    else
+    {
+      ROS_WARN_STREAM("read back texture is not valid");
     }
 
     const uint32_t cur_frame = bgfx::frame();
