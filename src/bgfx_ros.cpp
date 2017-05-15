@@ -538,7 +538,6 @@ public:
 				ROS_ERROR_STREAM("creating shader program failed");
 				return false;
 			}
-      ROS_INFO_STREAM("shadow sampler supported");
 
       shadowMapSize = 512;
 			shadowMapTexture = bgfx::createTexture2D(shadowMapSize, shadowMapSize,
@@ -546,6 +545,8 @@ public:
 					BGFX_TEXTURE_RT | BGFX_TEXTURE_COMPARE_LEQUAL);
 			bgfx::TextureHandle fbtextures[] = { shadowMapTexture };
 			shadowMapFB = bgfx::createFrameBuffer(BX_COUNTOF(fbtextures), fbtextures, true);
+
+      ROS_INFO_STREAM("shadow sampler supported");
 		}
 		else
 		{
@@ -561,7 +562,6 @@ public:
 				ROS_ERROR_STREAM("creating shader program failed");
 				return false;
 			}
-      ROS_INFO_STREAM("use float depth packing into color buffer instead of shadow sampler");
 
 			shadowMapTexture = bgfx::createTexture2D(shadowMapSize, shadowMapSize,
 					false, 1, bgfx::TextureFormat::BGRA8, BGFX_TEXTURE_RT);
@@ -572,6 +572,8 @@ public:
 						bgfx::TextureFormat::D16, BGFX_TEXTURE_RT_WRITE_ONLY),
 			};
 			shadowMapFB = bgfx::createFrameBuffer(BX_COUNTOF(fbtextures), fbtextures, true);
+
+      ROS_INFO_STREAM("use float depth packing into color buffer instead of shadow sampler");
 		}
 
     // TODO(lucasw) delete these when done with them
@@ -660,7 +662,7 @@ public:
     reset_(BGFX_RESET_VSYNC),
     initted_(false),
     bgfx_initted_(false),
-    clear_color_(0x000000ff)
+    clear_color_(0xf00000ff)
   {
     initted_ = init();
   }
@@ -801,7 +803,7 @@ public:
     // Set view viewport.
     bgfx::setViewName(RENDER_SCENE_PASS_ID, "bgfx_ros");
     // TODO(lucasw) why not sest to width_ and height_?
-    bgfx::setViewRect(RENDER_SCENE_PASS_ID, 0, 0, bgfx::BackbufferRatio::Equal);
+    bgfx::setViewRect(RENDER_SCENE_PASS_ID, 0, 0, width_, height_);  // bgfx::BackbufferRatio::Equal);
     bgfx::setViewClear(RENDER_SCENE_PASS_ID, BGFX_CLEAR_COLOR | BGFX_CLEAR_DEPTH,
         clear_color_, 1.0f, 0);
     bgfx::setViewFrameBuffer(RENDER_SCENE_PASS_ID, frame_buffer_handle_);
@@ -825,6 +827,8 @@ public:
       light_dir[1] = static_cast<float>(light_dir_vec.getY());
       light_dir[2] = static_cast<float>(light_dir_vec.getZ());
       light_dir[3] = 1.0;
+      ROS_DEBUG_STREAM(light_dir_vec[0] << " " << light_dir_vec[1]
+          << " " << light_dir_vec[2]);
     }
 
 		/////////////////////////////////////////
@@ -965,7 +969,6 @@ public:
     {
       bgfx::touch(BACKBUFFER_PASS_ID);
       bgfx::blit(BACKBUFFER_PASS_ID, read_back_texture_, 0, 0,
-          // bgfx::getTexture(frame_buffer_handle_), 0, 0, width_, height_);
           frame_buffer_texture_[0], 0, 0, width_, height_);
       // toggle between the two image buffers
       const size_t image_ind = (buffer_ind_) % image_.size();
@@ -989,6 +992,8 @@ public:
       sensor_msgs::ImagePtr msg = cv_image.toImageMsg();
       cam_pub_.publish(*msg, *ci);
       ++buffer_ind_;
+
+      // ROS_INFO_STREAM("new image");
     }
     else
     {

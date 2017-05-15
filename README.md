@@ -43,3 +43,9 @@ Libraries are in `bgfx/.build/linux64_gcc/bin`
 ```
 
 Now can run a.out (test application without ros).
+
+# Use graphics card
+
+On amd laptop, can switch to graphics card like this instead of using intel::
+
+  DRI_PRIME=1 rosrun bgfx_ros bgfx_ros __name:=bgfx_ros
