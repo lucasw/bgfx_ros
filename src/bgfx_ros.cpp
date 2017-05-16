@@ -576,6 +576,7 @@ public:
       ROS_INFO_STREAM("use float depth packing into color buffer instead of shadow sampler");
 		}
 
+    // shadow
     // TODO(lucasw) delete these when done with them
 		mesh_state[0] = new MeshState();
 		mesh_state[0]->m_state = 0
@@ -590,6 +591,7 @@ public:
 		mesh_state[0]->m_viewId  = RENDER_SHADOW_PASS_ID;
 		mesh_state[0]->m_numTextures = 0;
 
+    // render
 		mesh_state[1] = new MeshState();
 		mesh_state[1]->m_state = 0
 					| BGFX_STATE_RGB_WRITE
@@ -829,6 +831,12 @@ public:
       light_dir[3] = 1.0;
       ROS_DEBUG_STREAM(light_dir_vec[0] << " " << light_dir_vec[1]
           << " " << light_dir_vec[2]);
+	    bgfx::setUniform(u_lightPos, light_dir);
+    }
+    else
+    {
+      ROS_WARN_STREAM("no light available");
+      continue;
     }
 
 		/////////////////////////////////////////
@@ -871,6 +879,16 @@ public:
     float mtxShadow[16];
     float lightMtx[16];
 
+    // TODO(lucasw)
+    // don't want to have to use this if there is no floor,
+    // but maybe it is needed regardless
+    float mtxFloor[16];
+    bx::mtxSRT(mtxFloor
+        , 30.0f, 30.0f, 30.0f
+        , 0.0f, 0.0f, 0.0f
+        , 0.0f, 0.0f, 0.0f
+        );
+
     const float sy = flipV ? 0.5f : -0.5f;
     const float mtxCrop[16] =
     {
@@ -888,7 +906,30 @@ public:
 		// Will the simple shadows not cast shadows on other objects, or
 		// only a special floor object in the example?
 		// If that is the case then can't really use this.
-    // bx::mtxMul(lightMtx, mtxFloor, mtxShadow);
+    bx::mtxMul(lightMtx, mtxFloor, mtxShadow);
+
+    uint32_t cached = bgfx::setTransform(mtxFloor);
+    for (uint32_t pass = 0; pass < 2; ++pass)
+    {
+      const MeshState& st = *mesh_state[pass];
+      bgfx::setTransform(cached);
+      for (uint8_t tex = 0; tex < st.m_numTextures; ++tex)
+      {
+        const MeshState::Texture& texture = st.m_textures[tex];
+        bgfx::setTexture(texture.m_stage
+            , texture.m_sampler
+            , texture.m_texture
+            , texture.m_flags
+            );
+      }
+      bgfx::setUniform(u_lightMtx, lightMtx);
+			// TODO(lucasw) need to actuall create the plane,
+      bgfx::setIndexBuffer(ibh);
+      bgfx::setVertexBuffer(vbh);
+      bgfx::setState(st.m_state);
+      bgfx::submit(st.m_viewId, st.m_program);
+    }
+
 		////////////////////////////////////////////
 
     for (auto const &ns_id : meshes_)
@@ -938,14 +979,12 @@ public:
           mat[i] = pre_mat_.values[i];
         }
         // print4x4Mat(mat, "pre mat");
-        float res[16];
-        bx::mtxMul(res, mat, mtx);
-				bx::mtxMul(lightMtx, res, mtxShadow);
+        // float res[16];
+        // bx::mtxMul(res, mat, mtx);
+				// bx::mtxMul(lightMtx, res, mtxShadow);
 
 				for (size_t i = 0; i < 2; ++i)
 				{
-					// TODO(lucasw) does this have to be done inside this loop?
-					// bgfx::setUniform(u_lightPos, light_dir);
 					// Set model matrix for rendering.
 					bgfx::setTransform(res);
 
