@@ -879,16 +879,6 @@ public:
     float mtxShadow[16];
     float lightMtx[16];
 
-    // TODO(lucasw)
-    // don't want to have to use this if there is no floor,
-    // but maybe it is needed regardless
-    float mtxFloor[16];
-    bx::mtxSRT(mtxFloor
-        , 30.0f, 30.0f, 30.0f
-        , 0.0f, 0.0f, 0.0f
-        , 0.0f, 0.0f, 0.0f
-        );
-
     const float sy = flipV ? 0.5f : -0.5f;
     const float mtxCrop[16] =
     {
@@ -901,40 +891,6 @@ public:
     float mtxTmp[16];
     bx::mtxMul(mtxTmp,    lightProj, mtxCrop);
     bx::mtxMul(mtxShadow, lightView, mtxTmp);
-
-    // TODO(lucasw)
-    // Will the simple shadows not cast shadows on other objects, or
-    // only a special floor object in the example?
-    // If that is the case then can't really use this.
-    // It looks like the floor doesn't need to be rendered below,
-    // but this lightMtx does need to calculcated so need mtxFloor.
-    // Actually don't even need mtxFloor or this, since lightMtx
-    // is recalculated for every object.
-    // bx::mtxMul(lightMtx, mtxFloor, mtxShadow);
-
-    /*
-    uint32_t cached = bgfx::setTransform(mtxFloor);
-    for (uint32_t pass = 0; pass < 2; ++pass)
-    {
-      const MeshState& st = *mesh_state[pass];
-      bgfx::setTransform(cached);
-      for (uint8_t tex = 0; tex < st.m_numTextures; ++tex)
-      {
-        const MeshState::Texture& texture = st.m_textures[tex];
-        bgfx::setTexture(texture.m_stage
-            , texture.m_sampler
-            , texture.m_texture
-            , texture.m_flags
-            );
-      }
-      bgfx::setUniform(u_lightMtx, lightMtx);
-      // TODO(lucasw) need to actually create the plane in init
-      bgfx::setIndexBuffer(ibh);
-      bgfx::setVertexBuffer(vbh);
-      bgfx::setState(st.m_state);
-      bgfx::submit(st.m_viewId, st.m_program);
-    }
-    */
 
     ////////////////////////////////////////////
 
