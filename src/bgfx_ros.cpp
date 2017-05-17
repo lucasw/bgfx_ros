@@ -326,28 +326,28 @@ class BgfxRos
   std::string light_frame_;
   bgfx::UniformHandle light_dir_handle_;
 
-	const uint8_t RENDER_SHADOW_PASS_ID = 0;
-	const uint8_t RENDER_SCENE_PASS_ID = 1;
-	const uint8_t BACKBUFFER_PASS_ID = 2;
+  const uint8_t RENDER_SHADOW_PASS_ID = 0;
+  const uint8_t RENDER_SCENE_PASS_ID = 1;
+  const uint8_t BACKBUFFER_PASS_ID = 2;
 
-	bool flipV;
-	bgfx::UniformHandle u_shadowMap;
-	bgfx::UniformHandle u_lightPos;
-	bgfx::UniformHandle u_lightMtx;
-	bgfx::UniformHandle u_depthScaleOffset;
-	float depthScale;
-	float depthOffset;
-	float depthScaleOffset[4];
+  bool flipV;
+  bgfx::UniformHandle u_shadowMap;
+  bgfx::UniformHandle u_lightPos;
+  bgfx::UniformHandle u_lightMtx;
+  bgfx::UniformHandle u_depthScaleOffset;
+  float depthScale;
+  float depthOffset;
+  float depthScaleOffset[4];
 
   // Render targets.
   uint16_t shadowMapSize;
 
-	bgfx::ProgramHandle progShadow;
+  bgfx::ProgramHandle progShadow;
   bgfx::ProgramHandle progMesh;
   bgfx::TextureHandle shadowMapTexture;
   bgfx::FrameBufferHandle shadowMapFB;
 
-	MeshState* mesh_state[2];
+  MeshState* mesh_state[2];
 
   float at_[3];
   float eye_[3];
@@ -502,114 +502,114 @@ public:
     }
 
     bgfx::RendererType::Enum renderer = bgfx::getRendererType();
-		flipV = false
-			|| renderer == bgfx::RendererType::OpenGL
-			|| renderer == bgfx::RendererType::OpenGLES;
+    flipV = false
+      || renderer == bgfx::RendererType::OpenGL
+      || renderer == bgfx::RendererType::OpenGLES;
 
-		u_shadowMap = bgfx::createUniform("u_shadowMap", bgfx::UniformType::Int1);
-		u_lightPos  = bgfx::createUniform("u_lightPos",  bgfx::UniformType::Vec4);
-		u_lightMtx  = bgfx::createUniform("u_lightMtx",  bgfx::UniformType::Mat4);
-		// When using GL clip space depth range [-1, 1] and packing depth into color buffer, we need to
-		// adjust the depth range to be [0, 1] for writing to the color buffer
-		u_depthScaleOffset = bgfx::createUniform("u_depthScaleOffset",  bgfx::UniformType::Vec4);
-		depthScale = flipV ? 0.5f : 1.0f;
-		depthOffset = flipV ? 0.5f : 0.0f;
-		depthScaleOffset[0] = depthScale;
+    u_shadowMap = bgfx::createUniform("u_shadowMap", bgfx::UniformType::Int1);
+    u_lightPos  = bgfx::createUniform("u_lightPos",  bgfx::UniformType::Vec4);
+    u_lightMtx  = bgfx::createUniform("u_lightMtx",  bgfx::UniformType::Mat4);
+    // When using GL clip space depth range [-1, 1] and packing depth into color buffer, we need to
+    // adjust the depth range to be [0, 1] for writing to the color buffer
+    u_depthScaleOffset = bgfx::createUniform("u_depthScaleOffset",  bgfx::UniformType::Vec4);
+    depthScale = flipV ? 0.5f : 1.0f;
+    depthOffset = flipV ? 0.5f : 0.0f;
+    depthScaleOffset[0] = depthScale;
     depthScaleOffset[1] = depthOffset;
     depthScaleOffset[2] = 0.0f;
     depthScaleOffset[3] = 0.0f;
-		bgfx::setUniform(u_depthScaleOffset, depthScaleOffset);
+    bgfx::setUniform(u_depthScaleOffset, depthScaleOffset);
 
     // Get renderer capabilities info.
     const bgfx::Caps* caps = bgfx::getCaps();
-		const bool shadowSamplerSupported = 0 != (caps->supported &
-				BGFX_CAPS_TEXTURE_COMPARE_LEQUAL);
+    const bool shadowSamplerSupported = 0 != (caps->supported &
+        BGFX_CAPS_TEXTURE_COMPARE_LEQUAL);
 
-		if (shadowSamplerSupported)
-		{
-			// Depth textures and shadow samplers are supported.
+    if (shadowSamplerSupported)
+    {
+      // Depth textures and shadow samplers are supported.
       if (!loadProgram(path + "vs_sms_shadow", path + "fs_sms_shadow", progShadow))
-			{
-				ROS_ERROR_STREAM("creating shader program failed");
-				return false;
-			}
+      {
+        ROS_ERROR_STREAM("creating shader program failed");
+        return false;
+      }
       if (!loadProgram(path + "vs_sms_mesh", path + "fs_sms_mesh", progMesh))
-			{
-				ROS_ERROR_STREAM("creating shader program failed");
-				return false;
-			}
+      {
+        ROS_ERROR_STREAM("creating shader program failed");
+        return false;
+      }
 
       shadowMapSize = 512;
-			shadowMapTexture = bgfx::createTexture2D(shadowMapSize, shadowMapSize,
-					false, 1, bgfx::TextureFormat::D16,
-					BGFX_TEXTURE_RT | BGFX_TEXTURE_COMPARE_LEQUAL);
-			bgfx::TextureHandle fbtextures[] = { shadowMapTexture };
-			shadowMapFB = bgfx::createFrameBuffer(BX_COUNTOF(fbtextures), fbtextures, true);
+      shadowMapTexture = bgfx::createTexture2D(shadowMapSize, shadowMapSize,
+          false, 1, bgfx::TextureFormat::D16,
+          BGFX_TEXTURE_RT | BGFX_TEXTURE_COMPARE_LEQUAL);
+      bgfx::TextureHandle fbtextures[] = { shadowMapTexture };
+      shadowMapFB = bgfx::createFrameBuffer(BX_COUNTOF(fbtextures), fbtextures, true);
 
       ROS_INFO_STREAM("shadow sampler supported");
-		}
-		else
-		{
-			// Depth textures and shadow samplers are not supported. Use float
-			// depth packing into color buffer instead.
+    }
+    else
+    {
+      // Depth textures and shadow samplers are not supported. Use float
+      // depth packing into color buffer instead.
       if (!loadProgram(path + "vs_sms_shadow_pd", path + "fs_sms_shadow_pd", progShadow))
-			{
-				ROS_ERROR_STREAM("creating shader program failed");
-				return false;
-			}
+      {
+        ROS_ERROR_STREAM("creating shader program failed");
+        return false;
+      }
       if (!loadProgram(path + "vs_sms_mesh", path + "fs_sms_mesh_pd", progMesh))
-			{
-				ROS_ERROR_STREAM("creating shader program failed");
-				return false;
-			}
+      {
+        ROS_ERROR_STREAM("creating shader program failed");
+        return false;
+      }
 
-			shadowMapTexture = bgfx::createTexture2D(shadowMapSize, shadowMapSize,
-					false, 1, bgfx::TextureFormat::BGRA8, BGFX_TEXTURE_RT);
-			bgfx::TextureHandle fbtextures[] =
-			{
-				shadowMapTexture,
-				bgfx::createTexture2D(shadowMapSize, shadowMapSize, false, 1,
-						bgfx::TextureFormat::D16, BGFX_TEXTURE_RT_WRITE_ONLY),
-			};
-			shadowMapFB = bgfx::createFrameBuffer(BX_COUNTOF(fbtextures), fbtextures, true);
+      shadowMapTexture = bgfx::createTexture2D(shadowMapSize, shadowMapSize,
+          false, 1, bgfx::TextureFormat::BGRA8, BGFX_TEXTURE_RT);
+      bgfx::TextureHandle fbtextures[] =
+      {
+        shadowMapTexture,
+        bgfx::createTexture2D(shadowMapSize, shadowMapSize, false, 1,
+            bgfx::TextureFormat::D16, BGFX_TEXTURE_RT_WRITE_ONLY),
+      };
+      shadowMapFB = bgfx::createFrameBuffer(BX_COUNTOF(fbtextures), fbtextures, true);
 
       ROS_INFO_STREAM("use float depth packing into color buffer instead of shadow sampler");
-		}
+    }
 
     // shadow
     // TODO(lucasw) delete these when done with them
-		mesh_state[0] = new MeshState();
-		mesh_state[0]->m_state = 0
-					| BGFX_STATE_RGB_WRITE
-					| BGFX_STATE_ALPHA_WRITE
-					| BGFX_STATE_DEPTH_WRITE
-					| BGFX_STATE_DEPTH_TEST_LESS
-					| BGFX_STATE_CULL_CW
-					| BGFX_STATE_MSAA
-					;
-		mesh_state[0]->m_program = progShadow;
-		mesh_state[0]->m_viewId  = RENDER_SHADOW_PASS_ID;
-		mesh_state[0]->m_numTextures = 0;
+    mesh_state[0] = new MeshState();
+    mesh_state[0]->m_state = 0
+          | BGFX_STATE_RGB_WRITE
+          | BGFX_STATE_ALPHA_WRITE
+          | BGFX_STATE_DEPTH_WRITE
+          | BGFX_STATE_DEPTH_TEST_LESS
+          | BGFX_STATE_CULL_CW
+          | BGFX_STATE_MSAA
+          ;
+    mesh_state[0]->m_program = progShadow;
+    mesh_state[0]->m_viewId  = RENDER_SHADOW_PASS_ID;
+    mesh_state[0]->m_numTextures = 0;
 
     // render
-		mesh_state[1] = new MeshState();
-		mesh_state[1]->m_state = 0
-					| BGFX_STATE_RGB_WRITE
-					| BGFX_STATE_ALPHA_WRITE
-					| BGFX_STATE_DEPTH_WRITE
-					| BGFX_STATE_DEPTH_TEST_LESS
-					| BGFX_STATE_CULL_CW
-					| BGFX_STATE_MSAA
-					;
-		mesh_state[1]->m_program = progMesh;
-		mesh_state[1]->m_viewId  = RENDER_SCENE_PASS_ID;
-		mesh_state[1]->m_numTextures = 1;
-		mesh_state[1]->m_textures[0].m_flags = UINT32_MAX;
-		mesh_state[1]->m_textures[0].m_stage = 0;
-		mesh_state[1]->m_textures[0].m_sampler = u_shadowMap;
-		mesh_state[1]->m_textures[0].m_texture = shadowMapTexture;
+    mesh_state[1] = new MeshState();
+    mesh_state[1]->m_state = 0
+          | BGFX_STATE_RGB_WRITE
+          | BGFX_STATE_ALPHA_WRITE
+          | BGFX_STATE_DEPTH_WRITE
+          | BGFX_STATE_DEPTH_TEST_LESS
+          | BGFX_STATE_CULL_CW
+          | BGFX_STATE_MSAA
+          ;
+    mesh_state[1]->m_program = progMesh;
+    mesh_state[1]->m_viewId  = RENDER_SCENE_PASS_ID;
+    mesh_state[1]->m_numTextures = 1;
+    mesh_state[1]->m_textures[0].m_flags = UINT32_MAX;
+    mesh_state[1]->m_textures[0].m_stage = 0;
+    mesh_state[1]->m_textures[0].m_sampler = u_shadowMap;
+    mesh_state[1]->m_textures[0].m_texture = shadowMapTexture;
 
-		#if 0
+    #if 0
     const bool has_mips = false;
     const uint16_t num_layers = 1;
     read_back_texture_ = bgfx::createTexture2D(width_, height_,
@@ -643,7 +643,7 @@ public:
     }
 
     light_dir_handle_ = bgfx::createUniform("light_dir", bgfx::UniformType::Vec4);
-		#endif
+    #endif
 
     frame_buffer_handle_ = bgfx::createFrameBuffer(2, frame_buffer_texture_);
     if (frame_buffer_handle_.idx == bgfx::invalidHandle)
@@ -831,16 +831,16 @@ public:
       light_dir[3] = 1.0;
       ROS_DEBUG_STREAM(light_dir_vec[0] << " " << light_dir_vec[1]
           << " " << light_dir_vec[2]);
-	    bgfx::setUniform(u_lightPos, light_dir);
+      bgfx::setUniform(u_lightPos, light_dir);
     }
     else
     {
       ROS_WARN_STREAM("no light available");
-      continue;
+      return;
     }
 
-		/////////////////////////////////////////
-		// setup the shadowmap
+    /////////////////////////////////////////
+    // setup the shadowmap
     float eye[3];
     eye[0] = -light_dir[0];
     eye[1] = -light_dir[1];
@@ -898,16 +898,21 @@ public:
       0.5f, 0.5f, depthOffset, 1.0f,
     };
 
-		float mtxTmp[16];
+    float mtxTmp[16];
     bx::mtxMul(mtxTmp,    lightProj, mtxCrop);
     bx::mtxMul(mtxShadow, lightView, mtxTmp);
 
-		// TODO(lucasw)
-		// Will the simple shadows not cast shadows on other objects, or
-		// only a special floor object in the example?
-		// If that is the case then can't really use this.
-    bx::mtxMul(lightMtx, mtxFloor, mtxShadow);
+    // TODO(lucasw)
+    // Will the simple shadows not cast shadows on other objects, or
+    // only a special floor object in the example?
+    // If that is the case then can't really use this.
+    // It looks like the floor doesn't need to be rendered below,
+    // but this lightMtx does need to calculcated so need mtxFloor.
+    // Actually don't even need mtxFloor or this, since lightMtx
+    // is recalculated for every object.
+    // bx::mtxMul(lightMtx, mtxFloor, mtxShadow);
 
+    /*
     uint32_t cached = bgfx::setTransform(mtxFloor);
     for (uint32_t pass = 0; pass < 2; ++pass)
     {
@@ -923,20 +928,22 @@ public:
             );
       }
       bgfx::setUniform(u_lightMtx, lightMtx);
-			// TODO(lucasw) need to actuall create the plane,
+      // TODO(lucasw) need to actually create the plane in init
       bgfx::setIndexBuffer(ibh);
       bgfx::setVertexBuffer(vbh);
       bgfx::setState(st.m_state);
       bgfx::submit(st.m_viewId, st.m_program);
     }
+    */
 
-		////////////////////////////////////////////
+    ////////////////////////////////////////////
 
     for (auto const &ns_id : meshes_)
     {
       for (auto const &id_mesh : ns_id.second)
       {
         const Mesh* const mesh = id_mesh.second;
+        // ROS_INFO_STREAM("mesh " << mesh->marker_->header.frame_id);
 
         // TODO(lucasw) incorporate tf
         // TODO(lucasw) set this up in advance?
@@ -949,6 +956,8 @@ public:
             ros::Time(0), transform,
             mesh->marker_->ns, mesh->marker_->id))
         {
+          ROS_WARN_STREAM("couldn't tf lookup " << frame_id_ << " "
+              << mesh->marker_->header.frame_id);
           continue;
         }
 
@@ -979,29 +988,38 @@ public:
           mat[i] = pre_mat_.values[i];
         }
         // print4x4Mat(mat, "pre mat");
-        // float res[16];
+        float res[16];
         // bx::mtxMul(res, mat, mtx);
-				// bx::mtxMul(lightMtx, res, mtxShadow);
+        bx::mtxMul(lightMtx, res, mtxShadow);
 
-				for (size_t i = 0; i < 2; ++i)
-				{
-					// Set model matrix for rendering.
-					bgfx::setTransform(res);
+        uint32_t cached = bgfx::setTransform(res);
+        for (size_t i = 0; i < 2; ++i)
+        {
+          // Set model matrix for rendering.
+          bgfx::setTransform(cached);
 
-					// TODO(lucasw) textures as in bgfx_util submit(
+          // Set render states.
+          bgfx::setState(mesh_state[i]->m_state);
+          // TODO(lucasw) textures as in bgfx_util submit(
+          for (uint8_t tex = 0; tex < mesh_state[i]->m_numTextures; ++tex)
+          {
+            const MeshState::Texture& texture = mesh_state[i]->m_textures[tex];
+            bgfx::setTexture(texture.m_stage
+                , texture.m_sampler
+                , texture.m_texture
+                , texture.m_flags
+                );
+          }
 
-					bgfx::setVertexBuffer(mesh->vbh_);
-					bgfx::setIndexBuffer(mesh->ibh_);
+          bgfx::setVertexBuffer(mesh->vbh_);
+          bgfx::setIndexBuffer(mesh->ibh_);
 
-					// Set render states.
-					bgfx::setState(mesh_state[i]->m_state);
-					// Submit primitive for rendering to view 0.
-					// bgfx::submit(0, program_);
-					bgfx::setUniform(u_lightMtx, lightMtx);
-					bgfx::submit(mesh_state[i]->m_viewId, mesh_state[i]->m_program);
-				}
+          // Submit primitive for rendering to view 0.
+          bgfx::setUniform(u_lightMtx, lightMtx);
+          bgfx::submit(mesh_state[i]->m_viewId, mesh_state[i]->m_program);
+        }
       }
-    }
+    }  // loop through all meshes
 
     // TODO(lucasw) does there need to be a isValid every update?
     if (bgfx::isValid(read_back_texture_))
