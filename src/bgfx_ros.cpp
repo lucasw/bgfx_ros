@@ -987,12 +987,17 @@ public:
         {
           mat[i] = pre_mat_.values[i];
         }
-        // print4x4Mat(mat, "pre mat");
         float res[16];
-        // bx::mtxMul(res, mat, mtx);
+        bx::mtxMul(res, mat, mtx);
         bx::mtxMul(lightMtx, res, mtxShadow);
+        if (mesh->marker_->header.frame_id == "frame1")
+        {
+          print4x4Mat(res, "res");
+          print4x4Mat(mtxShadow, "mtxShadow");
+          print4x4Mat(lightMtx, "lightMtx");
+        }
 
-        uint32_t cached = bgfx::setTransform(res);
+        const uint32_t cached = bgfx::setTransform(res);
         for (size_t i = 0; i < 2; ++i)
         {
           // Set model matrix for rendering.
