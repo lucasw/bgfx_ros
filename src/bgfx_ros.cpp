@@ -609,7 +609,6 @@ public:
     mesh_state[1]->m_textures[0].m_sampler = u_shadowMap;
     mesh_state[1]->m_textures[0].m_texture = shadowMapTexture;
 
-    #if 0
     const bool has_mips = false;
     const uint16_t num_layers = 1;
     read_back_texture_ = bgfx::createTexture2D(width_, height_,
@@ -643,7 +642,6 @@ public:
     }
 
     light_dir_handle_ = bgfx::createUniform("light_dir", bgfx::UniformType::Vec4);
-    #endif
 
     frame_buffer_handle_ = bgfx::createFrameBuffer(2, frame_buffer_texture_);
     if (frame_buffer_handle_.idx == bgfx::invalidHandle)
