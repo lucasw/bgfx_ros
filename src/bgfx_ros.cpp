@@ -539,7 +539,7 @@ public:
         return false;
       }
 
-      shadowMapSize = 512;
+      shadowMapSize = 2048;
       shadowMapTexture = bgfx::createTexture2D(shadowMapSize, shadowMapSize,
           false, 1, bgfx::TextureFormat::D16,
           BGFX_TEXTURE_RT | BGFX_TEXTURE_COMPARE_LEQUAL);
@@ -852,7 +852,7 @@ public:
     float lightView[16];
     bx::mtxLookAt(lightView, eye, at);
 
-    const float area = 30.0f;
+    const float area = 20.0f;
     float lightProj[16];
     bx::mtxOrtho(lightProj, -area, area, -area, area, -100.0f, 100.0f, 0.0f, flipV);
 
@@ -944,7 +944,7 @@ public:
         float res[16];
         bx::mtxMul(res, mat, mtx);
         bx::mtxMul(lightMtx, res, mtxShadow);
-        if (mesh->marker_->header.frame_id == "frame1")
+        if (false)  // (mesh->marker_->header.frame_id == "frame1")
         {
           print4x4Mat(res, "res");
           print4x4Mat(mtxShadow, "mtxShadow");
