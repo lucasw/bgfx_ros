@@ -80,7 +80,6 @@ float PCF(Sampler _sampler, vec4 _shadowCoord, float _bias, vec2 _texelSize)
 void main()
 {
 	float shadowMapBias = 0.005;
-	vec3 color = vec3_splat(1.0);
 
 	vec3 v  = v_view;
 	vec3 vd = -normalize(v);
@@ -93,8 +92,8 @@ void main()
 	vec2 texelSize = vec2_splat(1.0/512.0);
 	float visibility = PCF(s_shadowMap, v_shadowcoord, shadowMapBias, texelSize);
 
-	vec3 ambient = 0.1 * color;
-	vec3 brdf = (lc.x + lc.y) * color * visibility;
+	vec3 ambient = 0.1 * v_color0.xyz;
+	vec3 brdf = (lc.x + lc.y) * v_color0.xyz * visibility;
 
 	vec3 final = toGamma(abs(ambient + brdf) );
 	gl_FragColor = vec4(final, 1.0);

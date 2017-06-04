@@ -1,5 +1,5 @@
-$input a_position, a_normal
-$output v_view, v_normal, v_shadowcoord
+$input a_position, a_normal, a_color0
+$output v_view, v_normal, v_shadowcoord, v_color0
 
 /*
  * Copyright 2013-2014 Dario Manesku. All rights reserved.
@@ -21,4 +21,6 @@ void main()
 	const float shadowMapOffset = 0.001;
 	vec3 posOffset = a_position + normal.xyz * shadowMapOffset;
 	v_shadowcoord = mul(u_lightMtx, vec4(posOffset, 1.0) );
+  // passthrough
+  v_color0 = a_color0;
 }

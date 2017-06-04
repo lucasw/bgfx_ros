@@ -1,4 +1,4 @@
-$input v_view, v_normal, v_shadowcoord
+$input v_view, v_normal, v_shadowcoord, v_color0
 
 /*
  * Copyright 2013-2014 Dario Manesku. All rights reserved.
