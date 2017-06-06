@@ -11,11 +11,13 @@
 #include <SDL2/SDL.h>
 #include <SDL2/SDL_syswm.h>
 // this has to come after SDL.h
-#include <bgfx/platform.h>
 #include <bgfx/bgfx.h>
+#include <bgfx/platform.h>
+#include <bgfx_ros/ShadowConfig.h>
 #include <bx/fpumath.h>
 #include <camera_info_manager/camera_info_manager.h>
 #include <cv_bridge/cv_bridge.h>
+#include <dynamic_reconfigure/server.h>
 #include <opencv2/highgui.hpp>
 #include <fstream>
 #include <geometry_msgs/Pose.h>
@@ -305,6 +307,14 @@ class BgfxRos
 
   SDL_Window* window_;
 
+  boost::recursive_mutex shadow_dr_mutex_;
+  typedef dynamic_reconfigure::Server<bgfx_ros::ShadowConfig> ShadowReconfigureServer;
+  boost::shared_ptr<ShadowReconfigureServer> shadow_reconfigure_server_;
+  bgfx_ros::ShadowConfig shadow_config_;
+  void shadowReconfigureCallback(
+      bgfx_ros::ShadowConfig& config,
+      uint32_t level);
+
   int width_;
   int height_;
   int reset_;
@@ -374,6 +384,15 @@ public:
     for (size_t i = 0; i < image_.size(); ++i)
     {
       image_[i] = cv::Mat(cv::Size(width_, height_), CV_8UC4);
+    }
+
+    // dynamic reconfigure init
+    {
+      shadow_reconfigure_server_.reset(
+          new ShadowReconfigureServer(shadow_dr_mutex_, nh_));
+      dynamic_reconfigure::Server<bgfx_ros::ShadowConfig>::CallbackType scbt =
+        boost::bind(&BgfxRos::shadowReconfigureCallback, this, _1, _2);
+      shadow_reconfigure_server_->setCallback(scbt);
     }
 
     std::string camera_name = "camera";
@@ -852,9 +871,15 @@ public:
     float lightView[16];
     bx::mtxLookAt(lightView, eye, at);
 
-    const float area = 20.0f;
+    // TODO(lwalter) have a configure for all 16 elements
+    // or just bottom left + top right near clipping?
     float lightProj[16];
-    bx::mtxOrtho(lightProj, -area, area, -area, area, -100.0f, 100.0f, 0.0f, flipV);
+    bx::mtxOrtho(
+        lightProj,
+        shadow_config_.x, shadow_config_.x + shadow_config_.width,
+        shadow_config_.y, shadow_config_.x + shadow_config_.height,
+        shadow_config_.z, shadow_config_.z + shadow_config_.depth,
+        shadow_config_.offset, flipV);
 
     bgfx::setViewTransform(RENDER_SHADOW_PASS_ID, lightView, lightProj);
 
@@ -1024,6 +1049,14 @@ public:
     ++i_;
   }  // update
 };
+
+
+void BgfxRos::shadowReconfigureCallback(
+    bgfx_ros::ShadowConfig& config,
+    uint32_t level)
+{
+  shadow_config_ = config;
+}
 
 int main(int argc, char** argv)
 {

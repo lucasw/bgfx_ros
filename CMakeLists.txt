@@ -4,6 +4,7 @@ project(bgfx_ros)
 find_package(catkin REQUIRED COMPONENTS
   camera_info_manager
   cv_bridge
+  dynamic_reconfigure
   geometry_msgs
   image_transport
   roscpp
@@ -14,8 +15,12 @@ find_package(catkin REQUIRED COMPONENTS
   visualization_msgs
 )
 
-roslint_cpp()
+roslint_cpp(src/bgfx_ros.cpp)
 roslint_python()
+
+generate_dynamic_reconfigure_options(
+  cfg/Shadow.cfg
+)
 
 # http://stackoverflow.com/questions/23850472/how-to-use-sdl2-and-sdl-image-with-cmake
 # find_package(SDL2 REQUIRED)
@@ -32,6 +37,7 @@ find_package(OpenGL REQUIRED)
 catkin_package(
   CATKIN_DEPENDS roscpp roslint rospy message_runtime
 )
+
 
 set(BGFX_DIR $ENV{HOME}/other/bgfx CACHE PATH "location of bgfx directory")
 set(BX_DIR $ENV{HOME}/other/bx CACHE PATH "location of bx directory")
@@ -106,6 +112,8 @@ add_executable(
   ${FRAGMENT_SHADERS_BIN}
   src/bgfx_ros.cpp
 )
+
+add_dependencies(bgfx_ros bgfx_ros_gencfg)
 
 target_link_libraries(bgfx_ros
   ${catkin_LIBRARIES}
