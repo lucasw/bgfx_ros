@@ -14,7 +14,7 @@
 #include <bgfx/bgfx.h>
 #include <bgfx/platform.h>
 #include <bgfx_ros/ShadowConfig.h>
-#include <bx/fpumath.h>
+#include <bx/math.h>
 #include <camera_info_manager/camera_info_manager.h>
 #include <cv_bridge/cv_bridge.h>
 #include <dynamic_reconfigure/server.h>
@@ -273,8 +273,8 @@ public:
 
   ~Mesh()
   {
-    bgfx::destroyIndexBuffer(ibh_);
-    bgfx::destroyVertexBuffer(vbh_);
+    bgfx::destroy(ibh_);
+    bgfx::destroy(vbh_);
   }
   // TODO(lucasw) triangle list or strip mode
 
@@ -359,8 +359,8 @@ class BgfxRos
 
   MeshState* mesh_state[2];
 
-  float at_[3];
-  float eye_[3];
+  bx::Vec3 at_;
+  bx::Vec3 eye_;
   uint32_t clear_color_;
 
 public:
@@ -478,7 +478,10 @@ public:
     pd.backBufferDS = NULL;
     bgfx::setPlatformData(pd);
 
-    if (!bgfx::init(bgfx::RendererType::Count, BGFX_PCI_ID_NONE))
+    bgfx::Init init;
+    init.type = bgfx::RendererType::Count;
+    init.vendorId = BGFX_PCI_ID_NONE;
+    if (!bgfx::init(init))  // bgfx::RendererType::Count, BGFX_PCI_ID_NONE))
     // if (!bgfx::init(bgfx::RendererType::OpenGL, BGFX_PCI_ID_NONE))
     // if (!bgfx::init(bgfx::RendererType::OpenGL, BGFX_PCI_ID_NVIDIA))
     {
@@ -505,13 +508,13 @@ public:
     ///////////////
     PosNormalColorVertex::init();
 
-    at_[0] = 0.0f;
-    at_[1] = 0.0f;
-    at_[2] = 1.0f;
+    at_.x = 0.0f;
+    at_.y = 0.0f;
+    at_.z = 1.0f;
     // this is where the camera actually is
-    eye_[0] = 0.0f;
-    eye_[1] = 0.0f;
-    eye_[2] = 0.0f;
+    eye_.x = 0.0f;
+    eye_.y = 0.0f;
+    eye_.z = 0.0f;
 
     if ((bgfx::getCaps()->supported & (BGFX_CAPS_TEXTURE_BLIT | BGFX_CAPS_TEXTURE_READ_BACK)) !=
         (BGFX_CAPS_TEXTURE_BLIT|BGFX_CAPS_TEXTURE_READ_BACK))
@@ -561,7 +564,7 @@ public:
       shadowMapSize = 2048;
       shadowMapTexture = bgfx::createTexture2D(shadowMapSize, shadowMapSize,
           false, 1, bgfx::TextureFormat::D16,
-          BGFX_TEXTURE_RT | BGFX_TEXTURE_COMPARE_LEQUAL);
+          BGFX_TEXTURE_RT);  // | BGFX_TEXTURE_COMPARE_LEQUAL);  // TODO(lucasw)
       bgfx::TextureHandle fbtextures[] = { shadowMapTexture };
       shadowMapFB = bgfx::createFrameBuffer(BX_COUNTOF(fbtextures), fbtextures, true);
 
@@ -599,9 +602,9 @@ public:
     // TODO(lucasw) delete these when done with them
     mesh_state[0] = new MeshState();
     mesh_state[0]->m_state = 0
-          | BGFX_STATE_RGB_WRITE
-          | BGFX_STATE_ALPHA_WRITE
-          | BGFX_STATE_DEPTH_WRITE
+          // | BGFX_STATE_RGB_WRITE  // TODO(lucasw)
+          // | BGFX_STATE_ALPHA_WRITE
+          // | BGFX_STATE_DEPTH_WRITE
           | BGFX_STATE_DEPTH_TEST_LESS
           | BGFX_STATE_CULL_CW
           | BGFX_STATE_MSAA
@@ -613,9 +616,9 @@ public:
     // render
     mesh_state[1] = new MeshState();
     mesh_state[1]->m_state = 0
-          | BGFX_STATE_RGB_WRITE
-          | BGFX_STATE_ALPHA_WRITE
-          | BGFX_STATE_DEPTH_WRITE
+          // | BGFX_STATE_RGB_WRITE   // TODO(lucasw)
+          // | BGFX_STATE_ALPHA_WRITE
+          // | BGFX_STATE_DEPTH_WRITE
           | BGFX_STATE_DEPTH_TEST_LESS
           | BGFX_STATE_CULL_CW
           | BGFX_STATE_MSAA
@@ -663,7 +666,7 @@ public:
     light_dir_handle_ = bgfx::createUniform("light_dir", bgfx::UniformType::Vec4);
 
     frame_buffer_handle_ = bgfx::createFrameBuffer(2, frame_buffer_texture_);
-    if (frame_buffer_handle_.idx == bgfx::invalidHandle)
+    if (frame_buffer_handle_.idx == bgfx::kInvalidHandle)
     {
       ROS_ERROR_STREAM("couldn't create fbh");
       return false;
@@ -811,10 +814,14 @@ public:
     // The distortion can be handled downstream using a distortion node,
     // but later a gpu version would be interesting to have.
     float proj[16];
-    const float fovy = 2.0 * bx::fatan2(ci->K[5], ci->K[4]);
-    // const float fovx = 2.0 * bx::fatan2(ci->K[2], ci->K[0]);
-    bx::mtxProj(proj, fovy * 180.0 / bx::pi,
-        static_cast<float>(width_) / static_cast<float>(height_), 0.1f, 100.0f);
+    const float fovy = 2.0 * bx::atan2(ci->K[5], ci->K[4]);
+    // const float fovx = 2.0 * bx::atan2(ci->K[2], ci->K[0]);
+    const float fovy_deg = fovy * 180.0 / bx::kPi;
+    const float aspect = static_cast<float>(width_) / static_cast<float>(height_);
+    const float near = 0.1f;
+    const float far = 100.0f;
+    const bool homogeneous_depth = false;
+    bx::mtxProj(proj, fovy_deg, aspect, near, far, homogeneous_depth);
     // TODO(lucasw) also want ability to set projection matrix
     // entirely from message
     bgfx::setViewTransform(RENDER_SCENE_PASS_ID, view, proj);
@@ -858,15 +865,15 @@ public:
 
     /////////////////////////////////////////
     // setup the shadowmap
-    float eye[3];
-    eye[0] = -light_dir[0];
-    eye[1] = -light_dir[1];
-    eye[2] = -light_dir[2];
+    bx::Vec3 eye;
+    eye.x = -light_dir[0];
+    eye.y = -light_dir[1];
+    eye.z = -light_dir[2];
 
-    float at[3];
-    at[0] = 0.0f;
-    at[1] = 0.0f;
-    at[2] = 0.0f;
+    bx::Vec3 at;
+    at.x = 0.0f;
+    at.y = 0.0f;
+    at.z = 0.0f;
 
     float lightView[16];
     bx::mtxLookAt(lightView, eye, at);

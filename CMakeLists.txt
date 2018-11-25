@@ -29,7 +29,7 @@ INCLUDE(FindPkgConfig)
 PKG_SEARCH_MODULE(SDL2 REQUIRED sdl2)
 # PKG_SEARCH_MODULE(SDL2IMAGE REQUIRED SDL2_image>=2.0.0)
 
-add_definitions(-std=c++11)
+add_definitions(-std=c++14)
 ####
 
 find_package(OpenGL REQUIRED)
@@ -40,6 +40,7 @@ catkin_package(
 
 
 set(BGFX_DIR $ENV{HOME}/other/bgfx CACHE PATH "location of bgfx directory")
+set(BIMG_DIR $ENV{HOME}/other/bimg CACHE PATH "location of bgfx directory")
 set(BX_DIR $ENV{HOME}/other/bx CACHE PATH "location of bx directory")
 
 if (CMAKE_BUILD_TYPE MATCHES Debug)
@@ -59,6 +60,7 @@ include_directories(
   ${BGFX_DIR}/include
   ${BGFX_DIR}/examples/common
   ${BGFX_DIR}/3rdparty
+  ${BIMG_DIR}/include
   ${BX_DIR}/include
 	${SDL2_INCLUDE_DIRS} # ${SDL2IMAGE_INCLUDE_DIRS}
   ${catkin_INCLUDE_DIRS}
@@ -212,14 +214,16 @@ list(APPEND SM_FRAGMENT_SHADERS_BIN ${FS}.bin)
 endforeach (FS ${SM_FRAGMENT_SHADERS})
 
 
+# TODO(lucasw) need to update this for latest bgfx
+if(false)
 add_executable(shadowmaps src/shadowmaps/shadowmaps.cpp
   ${SM_VERTEX_SHADERS_BIN}
   ${SM_FRAGMENT_SHADERS_BIN}
   # ${BGFX_DIR}/examples/common/bgfx_utils.cpp
-  ${BGFX_DIR}/3rdparty/ocornut-imgui/imgui.cpp
+  ${BGFX_DIR}/3rdparty/dear-imgui/imgui.cpp
   ${BGFX_DIR}/3rdparty/ib-compress/indexbufferdecompression.cpp
-  ${BGFX_DIR}/3rdparty/ocornut-imgui/imgui_draw.cpp
-  ${BGFX_DIR}/examples/common/imgui/ocornut_imgui.cpp
+  ${BGFX_DIR}/3rdparty/dear-imgui/imgui_draw.cpp
+  # ${BGFX_DIR}/examples/common/imgui/ocornut_imgui.cpp
   ${BGFX_DIR}/examples/common/imgui/imgui.cpp
   # ${BGFX_DIR}/examples/common/camera.cpp
   # ${BGFX_DIR}/examples/common/entry/entry.cpp
@@ -230,7 +234,6 @@ add_executable(shadowmaps src/shadowmaps/shadowmaps.cpp
   ${BGFX_DIR}/examples/common/nanovg/nanovg_bgfx.cpp
 )
 
-
 target_link_libraries(shadowmaps
   ${catkin_LIBRARIES}
   # opengl has to come after bgfx
@@ -240,6 +243,7 @@ target_link_libraries(shadowmaps
 	${SDL2_LIBRARIES}  # ${SDL2IMAGE_LIBRARIES}
   ${OPENGL_LIBRARIES}
 )
+endif(false)
 ###
 
 install(FILES src/fs_cubes.bin src/vs_cubes.bin

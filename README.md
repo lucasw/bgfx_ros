@@ -26,11 +26,24 @@ mkdir ~/other
 cd ~/other
 git clone https://github.com/bkaradzic/bgfx.git
 git clone https://github.com/bkaradzic/bx.git
+git clone https://github.com/bkaradzic/bimg.git
 cd bgfx
 make linux-release64
 make linux-debug64
 ```
 
+If updating an old build:
+
+```
+cd ~/other/bx
+git pull
+cd ~/other/bimg
+git pull
+cd ~/other/bgfx
+git pull
+make clean  # if rebuilding
+make linux-release64 && make linux-debug64
+```
 
 Libraries are in `bgfx/.build/linux64_gcc/bin`
 
@@ -43,6 +56,13 @@ Libraries are in `bgfx/.build/linux64_gcc/bin`
 ```
 
 Now can run a.out (test application without ros).
+
+To run examples:
+
+```
+cd bgfx/examples/runtime
+../../.build/linux64_gcc/bin/examplesRelease
+```
 
 # Use graphics card
 

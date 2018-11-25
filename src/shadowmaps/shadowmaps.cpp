@@ -14,7 +14,7 @@
 
 #include <bgfx/bgfx.h>
 #include <bx/timer.h>
-#include <bx/fpumath.h>
+#include <bx/math.h>
 #include <bx/crtimpl.h>
 // #include "entry/entry.h"
 // #include "camera.h"
